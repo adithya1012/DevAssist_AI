@@ -81,7 +81,7 @@ function mergePromise<T>(promise1: Promise<T>, promise2: Promise<void>): Promise
 // }
 
 // Function to run commands in the terminal with shell integration support
-function runCommand(terminalInfo: TerminalInfo, command: string): Promise<void> {
+function runCommand(this: any, terminalInfo: TerminalInfo, command: string): Promise<void> {
     terminalInfo.busy = true;
     terminalInfo.lastCommand = command;
 
