@@ -61,7 +61,6 @@ export function convertAnthropicContentToGemini(
 						},
 					} as FunctionResponsePart;
 				} else {
-					// The only case when tool_result could be array is when the tool failed and we're providing ie user feedback potentially with images
 					const textParts = block.content.filter((part) => part.type === "text");
 					const imageParts = block.content.filter((part) => part.type === "image");
 					const text = textParts.length > 0 ? textParts.map((part) => part.text).join("\n\n") : "";
@@ -120,9 +119,6 @@ export function convertAnthropicToolToGemini(tool: Anthropic.Messages.Tool): Fun
 	};
 }
 
-/*
-It looks like gemini likes to double escape certain characters when writing file contents: https://discuss.ai.google.dev/t/function-call-string-property-is-double-escaped/37867
-*/
 export function unescapeGeminiContent(content: string) {
 	return content
 		.replace(/\\n/g, "\n")
@@ -175,18 +171,17 @@ export function convertGeminiResponseToAnthropic(
 			case "OTHER":
 				stop_reason = "stop_sequence";
 				break;
-			// Add more cases if needed
 		}
 	}
 
 	return {
-		id: `msg_${Date.now()}`, // Generate a unique ID
+		id: `msg_${Date.now()}`,
 		type: "message",
 		role: "assistant",
 		content,
 		model: "",
 		stop_reason,
-		stop_sequence: null, // Gemini doesn't provide this information
+		stop_sequence: null,
 		usage: {
 			input_tokens: response.usageMetadata?.promptTokenCount ?? 0,
 			output_tokens: response.usageMetadata?.candidatesTokenCount ?? 0,

@@ -20,16 +20,14 @@ export function convertToOpenAiMessages(
 							acc.toolMessages.push(part);
 						} else if (part.type === "text" || part.type === "image") {
 							acc.nonToolMessages.push(part);
-						} // user cannot send tool_use messages
+						}
 						return acc;
 					},
 					{ nonToolMessages: [], toolMessages: [] }
 				);
 
-				// Process tool result messages FIRST since they must follow the tool use messages
 				let toolResultImages: Anthropic.Messages.ImageBlockParam[] = [];
 				toolMessages.forEach((toolMessage) => {
-					// The Anthropic SDK allows tool results to be a string or an array of text and image blocks, enabling rich and structured content. In contrast, the OpenAI SDK only supports tool results as a single string, so we map the Anthropic tool result parts into one concatenated string to maintain compatibility.
 					let content: string;
 
 					if (typeof toolMessage.content === "string") {
@@ -78,7 +76,7 @@ export function convertToOpenAiMessages(
 							acc.toolMessages.push(part);
 						} else if (part.type === "text" || part.type === "image") {
 							acc.nonToolMessages.push(part);
-						} // assistant cannot send tool_result messages
+						}
 						return acc;
 					},
 					{ nonToolMessages: [], toolMessages: [] }
@@ -90,7 +88,7 @@ export function convertToOpenAiMessages(
 					content = nonToolMessages
 						.map((part) => {
 							if (part.type === "image") {
-								return ""; // impossible as the assistant cannot send images
+								return "";
 							}
 							return part.text;
 						})
@@ -103,7 +101,6 @@ export function convertToOpenAiMessages(
 					type: "function",
 					function: {
 						name: toolMessage.name,
-						// json string
 						arguments: JSON.stringify(toolMessage.input),
 					},
 				}));
@@ -111,7 +108,6 @@ export function convertToOpenAiMessages(
 				openAiMessages.push({
 					role: "assistant",
 					content,
-					// Cannot be an empty array. API expects an array with minimum length 1, and will respond with an error if it's empty
 					tool_calls: tool_calls.length > 0 ? tool_calls : undefined,
 				});
 			}
@@ -129,7 +125,7 @@ export function convertToAnthropicMessage(
 	const anthropicMessage: Anthropic.Messages.Message = {
 		id: completion.id,
 		type: "message",
-		role: openAiMessage.role, // always "assistant"
+		role: openAiMessage.role,
 		content: [
 			{
 				type: "text",
@@ -145,12 +141,12 @@ export function convertToAnthropicMessage(
 					return "max_tokens";
 				case "tool_calls":
 					return "tool_use";
-				case "content_filter": // Anthropic doesn't have an exact equivalent
+				case "content_filter":
 				default:
 					return null;
 			}
 		})(),
-		stop_sequence: null, // which custom stop_sequence was generated, if any (not applicable if you don't use stop_sequence)
+		stop_sequence: null,
 		usage: {
 			input_tokens: completion.usage?.prompt_tokens || 0,
 			output_tokens: completion.usage?.completion_tokens || 0,
