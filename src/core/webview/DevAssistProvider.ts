@@ -1,11 +1,11 @@
 import * as vscode from "vscode";
 import { getNonce } from "./getNonce";
 import { getUri } from "./getUri";
+import { ExtensionMessage } from "../../shared/ExtensionMessage";
 
 export const GlobalFileNames = {
 	apiConversationHistory: "api_conversation_history.json",
 	uiMessages: "ui_messages.json",
-	openRouterModels: "openrouter_models.json",
 };
 
 export class DevAssistProvider implements vscode.WebviewViewProvider {
@@ -108,6 +108,11 @@ export class DevAssistProvider implements vscode.WebviewViewProvider {
 
 		// if the extension is starting a new session, clear previous task state
 		this.outputChannel.appendLine("Webview view resolved");
+	}
+
+	// Send any JSON serializable data to the react app
+	async postMessageToWebview(message: ExtensionMessage) {
+		await this.view?.webview.postMessage(message);
 	}
 
 	/**
