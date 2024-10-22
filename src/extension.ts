@@ -66,24 +66,6 @@ export function activate(context: vscode.ExtensionContext) {
 		vscode.commands.registerCommand("devassist_ai.popoutButtonClicked", openDevAssistInNewTab)
 	);
 	context.subscriptions.push(vscode.commands.registerCommand("devassist_ai.openInNewTab", openDevAssistInNewTab));
-
-	const handleUri = async (uri: vscode.Uri) => {
-		const path = uri.path;
-		const query = new URLSearchParams(uri.query.replace(/\+/g, "%2B"));
-		console.log("Handling URI", uri.toString());
-		switch (path) {
-			case "/openrouter": {
-				const code = query.get("code");
-				if (code) {
-					// await visibleProvider.handleOpenRouterCallback(code);
-				}
-				break;
-			}
-			default:
-				break;
-		}
-	};
-	context.subscriptions.push(vscode.window.registerUriHandler({ handleUri }));
 }
 
 // This method is called when your extension is deactivated
