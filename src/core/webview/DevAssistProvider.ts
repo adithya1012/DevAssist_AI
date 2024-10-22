@@ -1,7 +1,6 @@
 import * as vscode from "vscode";
 import { getNonce } from "./getNonce";
 import { getUri } from "./getUri";
-import { ExtensionMessage } from "../../shared/ExtensionMessage";
 
 export const GlobalFileNames = {
 	apiConversationHistory: "api_conversation_history.json",
@@ -111,7 +110,7 @@ export class DevAssistProvider implements vscode.WebviewViewProvider {
 	}
 
 	// Send any JSON serializable data to the react app
-	async postMessageToWebview(message: ExtensionMessage) {
+	async postMessageToWebview(message: any) {
 		await this.view?.webview.postMessage(message);
 	}
 
