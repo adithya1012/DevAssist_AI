@@ -1,10 +1,10 @@
 import { Avatar, Container } from "@mantine/core";
 import MessageContainer from "./MessageContainer";
 
-const UserMessage = () => {
+const UserMessage = ({message}:any) => {
     return (
         <MessageContainer>
-            User Message
+            {message.message}
         </MessageContainer>
     );
 }
