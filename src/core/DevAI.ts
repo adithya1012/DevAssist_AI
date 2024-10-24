@@ -107,7 +107,8 @@ export class DevAI {
             const filePath = typeof response.content === 'string' ? this.extractTagContent(response.content, "path") : null;
             const content = typeof response.content === 'string' ? this.extractTagContent(response.content, "content") : null;
             if (filePath && content) {
-                return await this.writeFileTool(filePath, content);
+                const prompt = "Please specify the file type"; // Example prompt
+                return await this.writeFileTool(filePath, content, prompt);
             }
         } else if ((response.content as string).includes("<ask_followup_question>")) {
             const question = typeof response.content === 'string' ? this.extractTagContent(response.content, "question") : null;
@@ -187,33 +188,74 @@ export class DevAI {
         }
     }
 
-    /**
-     * Writes content to a file at the given path and logs the result.
-     * @param filePath - The path of the file to write to.
-     * @param content - The content to write to the file.
-     * @returns A boolean indicating success or failure.
-     */
-    private async writeFileTool(filePath: string, content: string): Promise<boolean> {
-        try {
-            const absolutePath = path.resolve(cwd, filePath); // Resolve the absolute path of the file.
-            await fs.writeFile(absolutePath, content, "utf8"); // Write the content to the file.
 
-            // Log the success result to the conversation history.
+    
+    /**
+     * Writes content to a file based on the user's prompt and content.
+     * Automatically determines the file extension based on the prompt analysis.
+     * If the file does not exist, it creates the file with the appropriate extension and writes the content.
+     * If the file exists, it overwrites the content.
+     *
+     * @param filePath - The base path for the file (without extension).
+     * @param content - The content to write into the file.
+     * @param prompt - The user's input describing the file (e.g., language or file type).
+     * @returns - A boolean indicating the success or failure of the file writing process.
+     */
+    private async writeFileTool(filePath: string, content: string, prompt: string): Promise<boolean> {
+        try {
+            // Convert the prompt to lowercase for easier matching
+            const lowerPrompt = prompt.toLowerCase();
+            let extension = '';
+    
+            // Analyze the prompt directly within this function to determine the appropriate file extension
+            if (lowerPrompt.includes('typescript') || lowerPrompt.includes('ts')) {
+                extension = '.ts';
+            } else if (lowerPrompt.includes('python') || lowerPrompt.includes('py')) {
+                extension = '.py';
+            } else if (lowerPrompt.includes('javascript') || lowerPrompt.includes('js')) {
+                extension = '.js';
+            } else if (lowerPrompt.includes('html')) {
+                extension = '.html';
+            } else if (lowerPrompt.includes('java')) {
+                extension = '.java';
+            } else if (lowerPrompt.includes('css') || lowerPrompt.includes('stylesheet')) {
+                // Handle CSS files dynamically if 'CSS' or 'stylesheet' is mentioned in the prompt
+                extension = '.css';
+            } else {
+                // Ask the user for clarification if no file type can be determined from the prompt
+                this.apiConversationHistory.push({
+                    role: "assistant",
+                    content: `I couldn't determine the file type from your prompt: "${prompt}". Could you please specify the file type (e.g., CSS, Python, HTML)?`
+                });
+                return false;
+            }
+    
+            // Append the determined file extension to the file path
+            const absolutePath = path.resolve(cwd, filePath + extension);
+    
+            console.log(`Creating file at: ${absolutePath} based on the prompt: "${prompt}"`);
+    
+            // Write the content to the file (whether it exists or not)
+            await fs.writeFile(absolutePath, content, "utf8");
+    
+            console.log(`Content written to file: ${absolutePath}`); // Log the success
             this.apiConversationHistory.push({
                 role: "assistant",
-                content: formatWriteFileSuccess(filePath)
+                content: `File created or updated successfully: ${filePath + extension}`
             });
-
+    
             return true;
         } catch (error) {
-            // Log the error if writing to the file fails.
+            console.log(`Error occurred: ${error.message}`);
+            // Log the error if writing to the file fails
             this.apiConversationHistory.push({
                 role: "assistant",
-                content: formatToolError(`Failed to write to file: ${filePath}`)
+                content: `Failed to write to file: ${filePath}`
             });
             return false;
         }
     }
+    
 
     /**
      * Asks the user a follow-up question and logs their response.
