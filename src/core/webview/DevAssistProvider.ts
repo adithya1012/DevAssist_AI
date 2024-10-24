@@ -1,11 +1,12 @@
 import * as vscode from "vscode";
 import { getNonce } from "./getNonce";
 import { getUri } from "./getUri";
+import { DevAssist } from "..";
+import { ApiProvider } from "../../shared/api";
 
 export const GlobalFileNames = {
 	apiConversationHistory: "api_conversation_history.json",
 	uiMessages: "ui_messages.json",
-	openRouterModels: "openrouter_models.json",
 };
 
 export class DevAssistProvider implements vscode.WebviewViewProvider {
@@ -14,7 +15,7 @@ export class DevAssistProvider implements vscode.WebviewViewProvider {
 	private static activeInstances: Set<DevAssistProvider> = new Set();
 	private disposables: vscode.Disposable[] = [];
 	private view?: vscode.WebviewView | vscode.WebviewPanel;
-
+	private devAssist?: DevAssist;
 	constructor(readonly context: vscode.ExtensionContext, private readonly outputChannel: vscode.OutputChannel) {
 		this.outputChannel.appendLine("DevAssistProvider instantiated");
 		DevAssistProvider.activeInstances.add(this);
@@ -57,6 +58,7 @@ export class DevAssistProvider implements vscode.WebviewViewProvider {
 		};
 		webviewView.webview.html = this.getHtmlContent(webviewView.webview);
 
+		this.setWebviewMessageListener(webviewView.webview);
 		// Listen for when the panel becomes visible
 		// https://github.com/microsoft/vscode-discussions/discussions/840
 		if ("onDidChangeViewState" in webviewView) {
@@ -108,6 +110,76 @@ export class DevAssistProvider implements vscode.WebviewViewProvider {
 
 		// if the extension is starting a new session, clear previous task state
 		this.outputChannel.appendLine("Webview view resolved");
+	}
+
+	private setWebviewMessageListener(webview: vscode.Webview) {
+		webview.onDidReceiveMessage(
+			async (message: any) => {
+				switch (message.type) {
+					case "webviewDidLaunch":
+						await this.postMessageToWebview({ type: "extensionDidLaunch" });
+						break;
+					case "newTask":
+						await this.initNewTask(message.text, message.images);
+						break;
+					case "askQuestion":
+						await this.askQuestion(message.text);
+						break;
+				}
+			},
+			null,
+			this.disposables
+		);
+	}
+
+	async initNewTask(task?: string, images?: string[]) {
+		await this.clearTask();
+
+		const apiProvider: ApiProvider = "openai";
+		const apiModelId: string = "gpt-4o";
+		const apiKey: string = "";
+		const anthropicBaseUrl: string = "";
+		const openAiBaseUrl: string = "";
+		const openAiApiKey: string = "";
+		const openAiModelId: string = "gpt-4o";
+		const ollamaModelId: string = "";
+		const ollamaBaseUrl: string = "";
+		const geminiApiKey: string = "";
+
+		this.devAssist = new DevAssist(
+			this,
+			{
+				apiProvider,
+				apiModelId,
+				apiKey,
+				anthropicBaseUrl,
+				openAiBaseUrl,
+				openAiApiKey,
+				openAiModelId,
+				ollamaModelId,
+				ollamaBaseUrl,
+				geminiApiKey,
+			},
+			task
+		);
+	}
+
+	async askQuestion(text?: string) {
+		await this.devAssist?.say("text", text);
+	}
+
+	// Send any JSON serializable data to the react app
+	async postMessageToWebview(message: any) {
+		await this.view?.webview.postMessage(message);
+	}
+
+	async postStateToWebview() {
+		this.postMessageToWebview({
+			type: "state",
+			state: {
+				messages: this.devAssist?.messages || [],
+			},
+		});
 	}
 
 	/**
@@ -195,5 +267,10 @@ export class DevAssistProvider implements vscode.WebviewViewProvider {
           </body>
         </html>
       `;
+	}
+
+	async clearTask() {
+		this.devAssist?.abortTask();
+		this.devAssist = undefined;
 	}
 }
