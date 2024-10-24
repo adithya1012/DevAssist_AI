@@ -30,19 +30,34 @@ export class DevAI {
      * Starts a new task based on the provided input task.
      * @param task - The task provided by the user.
      */
+    // async startTask(task?: string) {
+    //     // Build the system prompt, appending custom instructions if available.
+    //     const systemPrompt = SYSTEM_PROMPT(cwd, true) + (this.customInstructions ? addCustomInstructions(this.customInstructions) : "");
+    //     this.apiConversationHistory.push({ role: "system", content: systemPrompt });
+
+    //     // If a task is provided by the user, push it to the conversation history as user input.
+    //     if (task) {
+    //         this.apiConversationHistory.push({ role: "user", content: `<task>\n${task}\n</task>` });
+    //     }
+
+    //     // Start the main task loop.
+    //     await this.runTaskLoop();
+    // }
+
     async startTask(task?: string) {
         // Build the system prompt, appending custom instructions if available.
         const systemPrompt = SYSTEM_PROMPT(cwd, true) + (this.customInstructions ? addCustomInstructions(this.customInstructions) : "");
-        this.apiConversationHistory.push({ role: "system", content: systemPrompt });
-
-        // If a task is provided by the user, push it to the conversation history as user input.
+    
+        // The system prompt is not pushed to conversation history, since it's not a "user" or "assistant" message.
         if (task) {
+            // Only push user tasks to the conversation history
             this.apiConversationHistory.push({ role: "user", content: `<task>\n${task}\n</task>` });
         }
-
+    
         // Start the main task loop.
         await this.runTaskLoop();
     }
+    
 
     /**
      * The main loop that processes user input, executes tools, and generates responses.
@@ -78,24 +93,24 @@ export class DevAI {
         this.apiConversationHistory.push(response);
 
         // Handle tool usage based on the assistant's response content.
-        if (response.content.includes("<execute_command>")) {
+        if (typeof response.content === 'string' && response.content.includes("<execute_command>")) {
             const command = this.extractTagContent(response.content, "command");
             if (command) {
                 return await this.executeCommandTool(command);
             }
-        } else if (response.content.includes("<read_file>")) {
-            const filePath = this.extractTagContent(response.content, "path");
+        } else if ((response.content as string).includes("<read_file>")) {
+            const filePath = typeof response.content === 'string' ? this.extractTagContent(response.content, "path") : null;
             if (filePath) {
                 return await this.readFileTool(filePath);
             }
-        } else if (response.content.includes("<write_to_file>")) {
-            const filePath = this.extractTagContent(response.content, "path");
-            const content = this.extractTagContent(response.content, "content");
+        } else if ((response.content as string).includes("<write_to_file>")) {
+            const filePath = typeof response.content === 'string' ? this.extractTagContent(response.content, "path") : null;
+            const content = typeof response.content === 'string' ? this.extractTagContent(response.content, "content") : null;
             if (filePath && content) {
                 return await this.writeFileTool(filePath, content);
             }
-        } else if (response.content.includes("<ask_followup_question>")) {
-            const question = this.extractTagContent(response.content, "question");
+        } else if ((response.content as string).includes("<ask_followup_question>")) {
+            const question = typeof response.content === 'string' ? this.extractTagContent(response.content, "question") : null;
             if (question) {
                 return await this.askFollowupQuestionTool(question);
             }
