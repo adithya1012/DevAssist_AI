@@ -146,7 +146,7 @@ export class DevAssistProvider implements vscode.WebviewViewProvider {
 		const openAiModelId: string = "gpt-4o";
 		const ollamaModelId: string = "";
 		const ollamaBaseUrl: string = "";
-		const geminiApiKey: string = "AIzaSyBbHuq0cjwXbfQipY6-azZWSEVUSB-Uc9I";
+		const geminiApiKey: string = ""; // TODO: Right now we need to provide API key manuslly here. This should an UI input in future.
 
 		this.devAssist = new DevAssist(
 			this,
