@@ -120,10 +120,11 @@ export class DevAssistProvider implements vscode.WebviewViewProvider {
 						await this.postMessageToWebview({ type: "extensionDidLaunch" });
 						break;
 					case "newTask":
-						await this.initNewTask(message.text, message.images);
+						await this.initNewTask(message.text);
 						break;
 					case "askQuestion":
-						await this.askQuestion(message.text);
+						// await this.askQuestion(message.text);
+						await this.initNewTask(message.text);
 						break;
 				}
 			},
@@ -135,8 +136,9 @@ export class DevAssistProvider implements vscode.WebviewViewProvider {
 	async initNewTask(task?: string, images?: string[]) {
 		await this.clearTask();
 
-		const apiProvider: ApiProvider = "openai";
-		const apiModelId: string = "gpt-4o";
+		// const apiProvider: ApiProvider = "openai";
+		const apiProvider: ApiProvider = "gemini";
+		const apiModelId: string = "";
 		const apiKey: string = "";
 		const anthropicBaseUrl: string = "";
 		const openAiBaseUrl: string = "";
@@ -144,7 +146,7 @@ export class DevAssistProvider implements vscode.WebviewViewProvider {
 		const openAiModelId: string = "gpt-4o";
 		const ollamaModelId: string = "";
 		const ollamaBaseUrl: string = "";
-		const geminiApiKey: string = "";
+		const geminiApiKey: string = "AIzaSyBbHuq0cjwXbfQipY6-azZWSEVUSB-Uc9I";
 
 		this.devAssist = new DevAssist(
 			this,
