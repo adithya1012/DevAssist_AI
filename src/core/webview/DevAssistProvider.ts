@@ -120,11 +120,10 @@ export class DevAssistProvider implements vscode.WebviewViewProvider {
 						await this.postMessageToWebview({ type: "extensionDidLaunch" });
 						break;
 					case "newTask":
-						await this.initNewTask(message.text);
+						await this.initNewTask(message.text, message.images);
 						break;
 					case "askQuestion":
-						// await this.askQuestion(message.text);
-						await this.initNewTask(message.text);
+						await this.askQuestion(message.text);
 						break;
 				}
 			},
@@ -136,9 +135,8 @@ export class DevAssistProvider implements vscode.WebviewViewProvider {
 	async initNewTask(task?: string, images?: string[]) {
 		await this.clearTask();
 
-		// const apiProvider: ApiProvider = "openai";
-		const apiProvider: ApiProvider = "gemini";
-		const apiModelId: string = "";
+		const apiProvider: ApiProvider = "openai";
+		const apiModelId: string = "gpt-4o";
 		const apiKey: string = "";
 		const anthropicBaseUrl: string = "";
 		const openAiBaseUrl: string = "";
@@ -146,7 +144,7 @@ export class DevAssistProvider implements vscode.WebviewViewProvider {
 		const openAiModelId: string = "gpt-4o";
 		const ollamaModelId: string = "";
 		const ollamaBaseUrl: string = "";
-		const geminiApiKey: string = ""; // TODO: Right now we need to provide API key manuslly here. This should an UI input in future.
+		const geminiApiKey: string = "";
 
 		this.devAssist = new DevAssist(
 			this,
