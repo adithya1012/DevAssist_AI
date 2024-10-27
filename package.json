@@ -4,7 +4,7 @@
   "description": "",
   "version": "0.0.1",
   "engines": {
-    "vscode": "^1.94.0"
+    "vscode": "^1.93.1"
   },
   "categories": [
     "Other"
@@ -74,12 +74,12 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.30.1",
+    "@google/generative-ai": "^0.21.0",
     "default-shell": "^2.2.0",
     "delay": "^6.0.0",
     "diff": "^5.2.0",
-    "os-name": "^6.0.0",
-    "@google/generative-ai": "^0.21.0",
-    "openai": "^4.68.1"
+    "openai": "^4.68.1",
+    "os-name": "^6.0.0"
   },
   "devDependencies": {
     "@types/diff": "^5.2.3",
