@@ -5,6 +5,13 @@ import { ApiHandler, createApiHandler } from "../api";
 import * as path from "path";
 import os from "os";
 import { SYSTEM_PROMPT } from "./prompts/system";
+import { AssistantMessageContent, parseAssistantMessage, ToolParamName, ToolUseName } from "./assistant-message"
+import cloneDeep from "clone-deep"
+import { formatResponse } from "./prompts/responses";
+import fs from "fs/promises";
+import { TerminalManager } from "../integrations/terminal/TerminalManager";
+
+
 
 
 const cwd = vscode.workspace.workspaceFolders?.map((folder) => folder.uri.fsPath).at(0) ?? path.join(os.homedir(), "Desktop")
@@ -13,6 +20,7 @@ export class DevAssist {
 	readonly taskId: string;
 	private abort: boolean = false;
 	api: ApiHandler;
+	terminalManager: TerminalManager = new TerminalManager();
 	providerRef: WeakRef<DevAssistProvider>;
 	messages: any[] = [];
 	lastMessageTs?: number;
@@ -20,6 +28,7 @@ export class DevAssist {
 	assistantMessageContent: any[] = []; 
 	didCompleteReadingStream: boolean = false;
 	userMessageContent: any[] = [];
+	currentStreamingContentIndex = 0; // TODO: update index of the current content being streamed
 	constructor(provider: DevAssistProvider, apiConfiguration: ApiConfiguration, task?: string) {
 		this.providerRef = new WeakRef(provider);
 		this.api = createApiHandler(apiConfiguration);
@@ -27,6 +36,36 @@ export class DevAssist {
 		this.startTask(task);
 	}
 
+	async say(type: string, text?: string) {
+		if (this.abort) {
+			throw new Error("Aborted");
+		}
+		const sayTs = Date.now();
+		this.lastMessageTs = sayTs;
+		await this.addToMessages({ ts: sayTs, type: "say", say: type, text }); // Message will be updated.
+		await this.providerRef.deref()?.postStateToWebview();
+	}
+	private async addToMessages(message: any) {
+		this.messages.push(message);
+	}
+
+	private async addToApiConversationHistory(message: any) {
+		this.apiConversationHistory.push(message);
+	}
+
+	abortTask() {
+		this.abort = true;
+	}
+
+	async sayAndCreateMissingParamError(toolName: ToolUseName, paramName: string, relPath?: string) {
+		await this.say(
+			"error",
+			`Cline tried to use ${toolName}${
+				relPath ? ` for '${relPath.toPosix()}'` : ""
+			} without value for required parameter '${paramName}'. Retrying...`
+		)
+		return formatResponse.toolError(formatResponse.missingToolParameterError(paramName))
+	}
 	private async startTask(task?: string): Promise<void> {
 		this.messages = [];
 		this.apiConversationHistory = [];
@@ -85,10 +124,10 @@ export class DevAssist {
 			try {
 				for await (const chunk of stream) {
 					assistantMessage += chunk.text
-					// TODO: parse raw assistant message into content blocks
-					// TODO: present content to user
-					console.log(assistantMessage);
+					this.assistantMessageContent = parseAssistantMessage(assistantMessage)
+					this.presentAssistantMessage()
 				}
+				
 			} catch (error) {
 				this.abortTask() 
 			}
@@ -104,10 +143,7 @@ export class DevAssist {
 					content: [{ type: "text", text: assistantMessage }],
 				});
 
-				console.log(this.assistantMessageContent);
-				// TODO: Need to identify in the response any of the tool used or not. 
-				// const didToolUse = this.assistantMessageContent.some((block) => block.type === "tool_use")
-				const didToolUse = false;
+				const didToolUse = this.assistantMessageContent.some((block) => block.type === "tool_use");
 				if (!didToolUse) {
 					this.userMessageContent.push({
 						type: "text",
@@ -131,6 +167,178 @@ export class DevAssist {
 		} catch (error) {
 			console.error(error)
 			return true
+		}
+	}
+
+
+	async presentAssistantMessage() {
+
+
+		const block = cloneDeep(this.assistantMessageContent[this.currentStreamingContentIndex]) // need to create copy bc while stream is updating the array, it could be updating the reference block properties too
+		switch (block.type) {
+			case "text": {
+
+				let content = block.content
+				if (content) {
+					content = content.replace(/<thinking>\s?/g, "")
+					content = content.replace(/\s?<\/thinking>/g, "")
+					const lastOpenBracketIndex = content.lastIndexOf("<")
+					if (lastOpenBracketIndex !== -1) {
+						const possibleTag = content.slice(lastOpenBracketIndex)
+						const hasCloseBracket = possibleTag.includes(">")
+						if (!hasCloseBracket) {
+							// Extract the potential tag name
+							let tagContent: string
+							if (possibleTag.startsWith("</")) {
+								tagContent = possibleTag.slice(2).trim()
+							} else {
+								tagContent = possibleTag.slice(1).trim()
+							}
+							const isLikelyTagName = /^[a-zA-Z_]+$/.test(tagContent)
+							const isOpeningOrClosing = possibleTag === "<" || possibleTag === "</"
+							if (isOpeningOrClosing || isLikelyTagName) {
+								content = content.slice(0, lastOpenBracketIndex).trim()
+							}
+						}
+					}
+				}
+				await this.say("text", content)
+				break
+			}
+			case "tool_use":
+				const toolDescription = () => {
+					switch (block.name) {
+						case "execute_command":
+							return `[${block.name} for '${block.params.command}']`
+						case "read_file":
+							return `[${block.name} for '${block.params.path}']`
+						case "write_to_file":
+							return `[${block.name} for '${block.params.path}']`
+						case "search_files":
+							return `[${block.name} for '${block.params.regex}'${
+								block.params.file_pattern ? ` in '${block.params.file_pattern}'` : ""
+							}]`
+						case "list_files":
+							return `[${block.name} for '${block.params.path}']`
+						case "list_code_definition_names":
+							return `[${block.name} for '${block.params.path}']`
+						case "inspect_site":
+							return `[${block.name} for '${block.params.url}']`
+						case "ask_followup_question":
+							return `[${block.name} for '${block.params.question}']`
+						case "attempt_completion":
+							return `[${block.name}]`
+						default:
+							return ``
+						}
+				}
+				const pushToolResult = (content: any) => {
+					this.userMessageContent.push({
+						type: "text",
+						text: `${toolDescription()} Result:`,
+					})
+					if (typeof content === "string") {
+						this.userMessageContent.push({
+							type: "text",
+							text: content || "(tool did not return anything)",
+						})
+					} else {
+						this.userMessageContent.push(...content)
+					}
+				}
+				const removeClosingTag = (tag: ToolParamName, text?: string) => {
+					if (!block.partial) {
+						return text || ""
+					}
+					if (!text) {
+						return ""
+					}
+					const tagRegex = new RegExp(
+						`\\s?<\/?${tag
+							.split("")
+							.map((char) => `(?:${char})?`)
+							.join("")}$`,
+						"g"
+					)
+					return text.replace(tagRegex, "")
+				}
+				switch (block.name) {
+					case "read_file": {
+						//TODO: implement read_file
+						break;
+					}
+					case "execute_command": {
+						const command: string = block.params.command
+								if (!command) {
+									pushToolResult(
+										await this.sayAndCreateMissingParamError("execute_command", "command")
+									)
+									break
+								}
+								const [userRejected, result] = await this.executeCommandTool(command)
+								pushToolResult(result)
+								break;
+					}
+					case "write_to_file": {
+						const relPath: string | undefined = block.params.path
+						let newContent: string | undefined = block.params.content
+						if (!relPath || !newContent) {
+							break
+						}
+						let fileExists: boolean = false;
+						const absolutePath = path.resolve(cwd, relPath)
+
+						if (newContent.startsWith("```")) {
+							newContent = newContent.split("\n").slice(1).join("\n").trim()
+						}
+						if (newContent.endsWith("```")) {
+							newContent = newContent.split("\n").slice(0, -1).join("\n").trim()
+						}
+
+						if (
+							newContent.includes("&gt;") ||
+							newContent.includes("&lt;") ||
+							newContent.includes("&quot;")
+						) {
+							newContent = newContent
+								.replace(/&gt;/g, ">")
+								.replace(/&lt;/g, "<")
+								.replace(/&quot;/g, '"')
+						}
+						// console.log("newContent", newContent)
+					
+						fs.writeFile(absolutePath, newContent, "utf8");
+							vscode.workspace.openTextDocument(absolutePath).then(doc => {
+							vscode.window.showTextDocument(doc);
+						});
+						break;
+
+					}
+				}
+		}
+		if (!block.partial ) {
+			this.currentStreamingContentIndex++ 
+		} 
+	}
+
+	async executeCommandTool(command: string): Promise<[boolean,string]> {
+		const terminalInfo = await this.terminalManager.getOrCreateTerminal(cwd)
+		terminalInfo.show() // weird visual bug when creating new terminals (even manually) where there's an empty space at the top.
+		// const process = this.terminalManager.runCommand(terminalInfo, command)
+		terminalInfo.sendText(command);
+		let result = ""
+		await process
+		let completed = true;
+		result = result.trim()
+		if (completed) {
+			return [false, `Command executed.${result.length > 0 ? `\nOutput:\n${result}` : ""}`]
+		} else {
+			return [
+				false,
+				`Command is still running in the user's terminal.${
+					result.length > 0 ? `\nHere's the output so far:\n${result}` : ""
+				}\n\nYou will be updated on the terminal status and new output in the future.`,
+			]
 		}
 	}
 
@@ -182,32 +390,8 @@ export class DevAssist {
 		} else {
 			details += "\n(No open tabs)"
 		}
-
-		// TODO: Sinduja code integrate for terminal.
-		// const busyTerminals = this.terminalManager.getTerminals(true)
-		// const inactiveTerminals = this.terminalManager.getTerminals(false)
-
 		return `<environment_details>\n${details.trim()}\n</environment_details>`
 	}
 
-	async say(type: string, text?: string) {
-		if (this.abort) {
-			throw new Error("Aborted");
-		}
-		const sayTs = Date.now();
-		this.lastMessageTs = sayTs;
-		await this.addToMessages({ ts: sayTs, type: "say", say: type, text }); // Message will be updated.
-		await this.providerRef.deref()?.postStateToWebview();
-	}
-	private async addToMessages(message: any) {
-		this.messages.push(message);
-	}
 
-	private async addToApiConversationHistory(message: any) {
-		this.apiConversationHistory.push(message);
-	}
-
-	abortTask() {
-		this.abort = true;
-	}
 }

@@ -4,7 +4,7 @@
   "description": "",
   "version": "0.0.1",
   "engines": {
-    "vscode": "^1.94.0"
+    "vscode": "^1.90.0"
   },
   "categories": [
     "Other"
@@ -74,12 +74,15 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.30.1",
+    "@types/clone-deep": "^4.0.4",
     "default-shell": "^2.2.0",
     "delay": "^6.0.0",
     "diff": "^5.2.0",
     "os-name": "^6.0.0",
     "@google/generative-ai": "^0.21.0",
-    "openai": "^4.68.1"
+    "openai": "^4.68.1",
+    "p-wait-for": "^5.0.2",
+    "clone-deep": "^4.0.1"
   },
   "devDependencies": {
     "@types/diff": "^5.2.3",
