@@ -127,6 +127,7 @@ export class DevAssist {
 					this.assistantMessageContent = parseAssistantMessage(assistantMessage)
 					this.presentAssistantMessage()
 				}
+				
 			} catch (error) {
 				this.abortTask() 
 			}
@@ -171,7 +172,7 @@ export class DevAssist {
 
 
 	async presentAssistantMessage() {
-		console.log("inside function")
+
 
 		const block = cloneDeep(this.assistantMessageContent[this.currentStreamingContentIndex]) // need to create copy bc while stream is updating the array, it could be updating the reference block properties too
 		switch (block.type) {
@@ -227,7 +228,9 @@ export class DevAssist {
 							return `[${block.name} for '${block.params.question}']`
 						case "attempt_completion":
 							return `[${block.name}]`
-					}
+						default:
+							return ``
+						}
 				}
 				const pushToolResult = (content: any) => {
 					this.userMessageContent.push({
@@ -262,6 +265,7 @@ export class DevAssist {
 				switch (block.name) {
 					case "read_file": {
 						//TODO: implement read_file
+						break;
 					}
 					case "execute_command": {
 						const command: string = block.params.command
@@ -273,6 +277,7 @@ export class DevAssist {
 								}
 								const [userRejected, result] = await this.executeCommandTool(command)
 								pushToolResult(result)
+								break;
 					}
 					case "write_to_file": {
 						const relPath: string | undefined = block.params.path
@@ -300,12 +305,13 @@ export class DevAssist {
 								.replace(/&lt;/g, "<")
 								.replace(/&quot;/g, '"')
 						}
-						console.log("newContent", newContent)
+						// console.log("newContent", newContent)
 					
 						fs.writeFile(absolutePath, newContent, "utf8");
 							vscode.workspace.openTextDocument(absolutePath).then(doc => {
 							vscode.window.showTextDocument(doc);
 						});
+						break;
 
 					}
 				}
