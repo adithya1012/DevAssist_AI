@@ -37,7 +37,6 @@ export function parseAssistantMessage(assistantMessage: string) {
 			}
 		}
 
-		// no currentParamName
 
 		if (currentToolUse) {
 			const currentToolValue = accumulator.slice(currentToolUseStartIndex)
@@ -61,7 +60,6 @@ export function parseAssistantMessage(assistantMessage: string) {
 
 				// there's no current param, and not starting a new param
 
-				// special case for write_to_file where file contents could contain the closing tag, in which case the param would have closed and we end up with the rest of the file contents here. To work around this, we get the string between the starting content tag and the LAST content tag.
 				const contentParamName: ToolParamName = "content"
 				if (currentToolUse.name === "write_to_file" && accumulator.endsWith(`</${contentParamName}>`)) {
 					const toolContent = accumulator.slice(currentToolUseStartIndex)
@@ -80,8 +78,6 @@ export function parseAssistantMessage(assistantMessage: string) {
 				continue
 			}
 		}
-
-		// no currentToolUse
 
 		let didStartToolUse = false
 		const possibleToolUseOpeningTags = toolUseNames.map((name) => `<${name}>`)
@@ -127,15 +123,12 @@ export function parseAssistantMessage(assistantMessage: string) {
 	if (currentToolUse) {
 		// stream did not complete tool call, add it as partial
 		if (currentParamName) {
-			// tool call has a parameter that was not completed
 			currentToolUse.params[currentParamName] = accumulator.slice(currentParamValueStartIndex).trim()
 		}
 		contentBlocks.push(currentToolUse)
 	}
 
-	// Note: it doesnt matter if check for currentToolUse or currentTextContent, only one of them will be defined since only one can be partial at a time
 	if (currentTextContent) {
-		// stream did not complete text content, add it as partial
 		contentBlocks.push(currentTextContent)
 	}
 
