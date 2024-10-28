@@ -1,5 +1,6 @@
 import { TextInput } from "@mantine/core";
 import { useState } from "react";
+import { vscode } from "../../utils/vscode"
 
 
 const ChatInput = () => {
@@ -8,6 +9,12 @@ const ChatInput = () => {
     const handleSubmit = (event:any) => {
         event.preventDefault();
         console.log(value);
+        vscode.postMessage({
+          type: "askQuestion",
+          // askResponse: "messageResponse",
+          text: value,
+          // images,
+        })
         setValue('');  
     };
 

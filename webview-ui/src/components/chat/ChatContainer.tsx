@@ -3,29 +3,29 @@ import UserMessage from "./UserMessage"
 
 
 const demoChat = [
-    {
-        type: "system",
-        message: "Welcome to the chat!"
-    },
+    // {
+    //     type: "system",
+    //     message: "Welcome to the chat!"
+    // },
+    // {
+    //     type: "user",
+    //     message: "Hello!"
+    // },
+    // {
+    //     type: "system",
+    //     message: "How can I help you today?"
+    // },
+    // {
+    //     type: "user",
+    //     message: "I have a question about my order."
+    // },
+    // {
+    //     type: "system",
+    //     message: "Sure! What is your order number?"
+    // },
     {
         type: "user",
-        message: "Hello!"
-    },
-    {
-        type: "system",
-        message: "How can I help you today?"
-    },
-    {
-        type: "user",
-        message: "I have a question about my order."
-    },
-    {
-        type: "system",
-        message: "Sure! What is your order number?"
-    },
-    {
-        type: "user",
-        message: "12345"
+        message: "this is a test message"
     },
     {
         type: "system",
