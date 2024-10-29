@@ -182,6 +182,10 @@ export class DevAssist {
 
 	async presentAssistantMessage() {
 		const block = cloneDeep(this.assistantMessageContent[this.currentStreamingContentIndex]); // need to create copy bc while stream is updating the array, it could be updating the reference block properties too
+		console.log("block", block);
+		if (!block) {
+			return;
+		}
 		switch (block.type) {
 			case "text": {
 				let content = block.content;
