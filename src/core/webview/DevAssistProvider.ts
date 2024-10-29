@@ -117,6 +117,7 @@ export class DevAssistProvider implements vscode.WebviewViewProvider {
 			async (message: any) => {
 				switch (message.type) {
 					case "webviewDidLaunch":
+						console.log("Webview did launch");
 						await this.postMessageToWebview({ type: "extensionDidLaunch" });
 						break;
 					case "newTask":

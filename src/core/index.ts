@@ -27,6 +27,11 @@ export class DevAssist {
 	didCompleteReadingStream: boolean = false;
 	userMessageContent: any[] = [];
 	currentStreamingContentIndex = 0; // TODO: update index of the current content being streamed
+
+	// Flags to keep track of the state of the tool use in current task to send events to the webview
+	isThinking = false;
+	isToolInUse = false;
+
 	constructor(provider: DevAssistProvider, apiConfiguration: ApiConfiguration, task?: string) {
 		this.providerRef = new WeakRef(provider);
 		this.api = createApiHandler(apiConfiguration);
@@ -41,6 +46,7 @@ export class DevAssist {
 		const sayTs = Date.now();
 		this.lastMessageTs = sayTs;
 		await this.addToMessages({ ts: sayTs, type: "say", say: type, text }); // Message will be updated.
+		console.log("Calling postStateToWebview");
 		await this.providerRef.deref()?.postStateToWebview();
 	}
 	private async addToMessages(message: any) {
@@ -98,7 +104,10 @@ export class DevAssist {
 				request: userContent,
 			})
 		);
-
+		this.isThinking = true;
+		this.providerRef.deref()?.postMessageToWebview({
+			type: "showThinking",
+		});
 		// TODO: FIXME: Environment is coming Undefined
 		// const environmentDetails = await this.loadContext(userContent, includeFileDetails)
 		const environmentDetails = "NONE";
@@ -118,7 +127,7 @@ export class DevAssist {
 				for await (const chunk of stream) {
 					assistantMessage += chunk.text;
 					this.assistantMessageContent = parseAssistantMessage(assistantMessage);
-					console.log("assistantMessageContent", this.assistantMessageContent);
+					// console.log("assistantMessageContent", this.assistantMessageContent);
 					this.presentAssistantMessage();
 				}
 			} catch (error) {
@@ -153,6 +162,16 @@ export class DevAssist {
 					content: [{ type: "text", text: "Failure: I did not provide a response." }],
 				});
 			}
+			await this.say(
+				"api_req_finished",
+				JSON.stringify({
+					response: assistantMessage,
+				})
+			);
+			this.isThinking = false;
+			this.providerRef.deref()?.postMessageToWebview({
+				type: "hideThinking",
+			});
 
 			return didEndLoop;
 		} catch (error) {
@@ -167,8 +186,25 @@ export class DevAssist {
 			case "text": {
 				let content = block.content;
 				if (content) {
+					const openTagRegex = /<thinking>\s?/g;
+					const closeTagRegex = /\s?<\/thinking>/g;
 					content = content.replace(/<thinking>\s?/g, "");
 					content = content.replace(/\s?<\/thinking>/g, "");
+
+					// if (!this.isThinking && openTagRegex.test(block.content)) {
+					// 	this.isThinking = true;
+					// 	this.providerRef.deref()?.postMessageToWebview({
+					// 		type: "showThinking",
+					// 	});
+					// }
+
+					// if (this.isThinking && closeTagRegex.test(block.content)) {
+					// 	this.isThinking = false;
+					// 	this.providerRef.deref()?.postMessageToWebview({
+					// 		type: "hideThinking",
+					// 	});
+					// }
+
 					const lastOpenBracketIndex = content.lastIndexOf("<");
 					if (lastOpenBracketIndex !== -1) {
 						const possibleTag = content.slice(lastOpenBracketIndex);
@@ -249,6 +285,13 @@ export class DevAssist {
 					);
 					return text.replace(tagRegex, "");
 				};
+				// if (!this.isToolInUse && block.name !== "attempt_completion") {
+				// 	this.isToolInUse = true;
+				// 	this.providerRef.deref()?.postMessageToWebview({
+				// 		type: "showToolInUse",
+				// 		toolName: block.name,
+				// 	});
+				// }
 				switch (block.name) {
 					case "read_file": {
 						//TODO: implement read_file
@@ -297,9 +340,19 @@ export class DevAssist {
 						});
 						break;
 					}
-
-					// Todo: ATTEMPT_COMPLETION
+					case "attempt_completion": {
+						this.providerRef.deref()?.postMessageToWebview({
+							type: "systemMessage",
+							message: block.params.result,
+						});
+						break;
+					}
 				}
+			// this.isToolInUse = false;
+			// this.providerRef.deref()?.postMessageToWebview({
+			// 	type: "hideToolInUse",
+			// 	toolName: block.name,
+			// });
 		}
 		if (!block.partial) {
 			this.currentStreamingContentIndex++;
