@@ -1,9 +1,9 @@
-import { TextInput } from "@mantine/core";
+import { ActionIcon, Textarea } from "@mantine/core";
 import { useState } from "react";
 import { vscode } from "../../utils/vscode";
 import { useExtension } from "../../context/ExtensionContext";
 
-const ChatInput = () => {
+const ChatInput = ({scrollChatViewToBottom, ...props}: any) => {
 	const [value, setValue] = useState("Create a python script for a simple calculator");
 
 	const { addAssistantMessage } = useExtension();
@@ -23,13 +23,23 @@ const ChatInput = () => {
 
 	return (
 		<form onSubmit={handleSubmit}>
-			<TextInput
+			<Textarea
 				value={value}
 				mt="md"
 				onChange={(event) => setValue(event.currentTarget.value)}
 				rightSectionPointerEvents="all"
-				rightSection={<button type="submit">Send</button>}
+				rightSection={<ActionIcon variant="transparent" color="gray" aria-label="Settings" type="submit">
+					<span
+					className="codicon codicon-send"
+					>
+					</span>
+				  </ActionIcon>}
 				placeholder="Ask a question!"
+				onKeyDown={(e)=>{
+					if(e.key === "Enter" && !e.shiftKey){
+						handleSubmit(e)
+					}
+				}}
 			/>
 		</form>
 	);

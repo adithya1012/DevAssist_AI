@@ -15,7 +15,7 @@ const ChatContainer = () => {
 					return <UserMessage key={index} message={message} />;
 				}
 			})}
-			{showThinking && <SystemMessage message={{ role: "assistant", content: "Thinking...." }} />}
+			{/* {showThinking && <SystemMessage message={{ role: "assistant", content: "Thinking...." }} />} */}
 
 			{/* {showToolInUse.show && <SystemMessage message={{ type: "system", message: `${showToolInUse.tool}` }} />} */}
 		</div>
