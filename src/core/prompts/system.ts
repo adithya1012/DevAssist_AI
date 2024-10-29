@@ -1,10 +1,9 @@
-
-import osName from "os-name"
-import defaultShell from "default-shell"
-import os from "os"
+import osName from "os-name";
+import defaultShell from "default-shell";
+import os from "os";
 
 export const SYSTEM_PROMPT = async (
-  cwd: string,
+	cwd: string
 ) => `You are DevAssist, a highly skilled software engineer with extensive knowledge in many programming languages, frameworks, design patterns, and best practices.
 
 ====
@@ -157,4 +156,4 @@ You accomplish a given task, breaking it down into clear steps and working throu
 2. Work through these goals sequentially, utilizing available tools one at a time as necessary. 
 3. Remember, you have extensive capabilities with access to a wide range of tools that can be used in powerful and clever ways as necessary to accomplish each goal. Before calling a tool, do some analysis within <thinking></thinking> tags. First, analyze the file structure provided in environment_details to gain context and insights for proceeding effectively. Then, think about which of the provided tools is the most relevant tool to accomplish the user's task.
 4. Once you've completed the user's task, you must use the attempt_completion tool to present the result of the task to the user.
-`
+`;
