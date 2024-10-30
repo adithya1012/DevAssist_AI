@@ -4,7 +4,7 @@ import MessageContainer from "./MessageContainer";
 const UserMessage = ({message}:any) => {
     return (
         <MessageContainer>
-            {message.message}
+            {message.content}
         </MessageContainer>
     );
 }

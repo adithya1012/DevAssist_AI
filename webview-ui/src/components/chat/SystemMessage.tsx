@@ -5,7 +5,7 @@ const SystemMessage = ({message}:any) => {
 
     return (
         <MessageContainer isSystemMessage>
-            {message.message}
+            {message.content}
 
             {
                 message.action && message.action.map((action:any, index:number) => {

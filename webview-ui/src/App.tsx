@@ -1,20 +1,20 @@
 import React from "react";
-import logo from "./logo.svg";
+import { useEvent } from "react-use";
 import "./App.css";
 import Welcome from "./components/Welcome";
 import ChatLayout from "./components/chat/Layout";
 // core styles are required for all packages
-import '@mantine/core/styles.css';
-import { createTheme, MantineProvider } from '@mantine/core';
+import "@mantine/core/styles.css";
+import { createTheme, MantineProvider } from "@mantine/core";
+import { ExtensionContextProvider } from "./context/ExtensionContext";
 
 function App() {
 	return (
 		<MantineProvider defaultColorScheme="dark">
-
-		<div >
-			{/* <Welcome /> */}
-			<ChatLayout />
-		</div>
+			<ExtensionContextProvider>
+				{/* <Welcome /> */}
+				<ChatLayout />
+			</ExtensionContextProvider>
 		</MantineProvider>
 	);
 }
