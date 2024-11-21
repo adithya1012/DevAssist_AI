@@ -21,8 +21,7 @@ export const ExtensionContextProvider: React.FC<{ children: React.ReactNode }> =
 		assistantMessages: { [key: string]: any }[];
 		taskHistory: any[];
 	}>({
-		assistantMessages: [{ role: "assistant", content: "Hi! I am DevAssistAI. test test test test test test test test test test test test " },
-			{ role: "User", content: "Hi! I am DevAssistAI. test test test test test test test test test test test test " }
+		assistantMessages: [{ role: "assistant", content: "Hi! I am DevAssistAI. " },
 		],
 		taskHistory: [],
 	});
