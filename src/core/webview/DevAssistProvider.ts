@@ -123,9 +123,21 @@ export class DevAssistProvider implements vscode.WebviewViewProvider {
 					case "newTask":
 						await this.initNewTask(message.text);
 						break;
+					// case "askQuestion":
+					// 	// await this.askQuestion(message.text);
+					// 	await this.initNewTask(message.text);
+					// 	break;
 					case "askQuestion":
-						// await this.askQuestion(message.text);
-						await this.initNewTask(message.text);
+						switch (message.newTask) {
+							case true:
+								await this.initNewTask(message.text);
+								break;
+							case false:
+								await this.devAssist?.handleWebviewAskResponse(message);
+								break;
+						}
+
+						// this.devAssist?.handleWebviewAskResponse(message);
 						break;
 				}
 			},

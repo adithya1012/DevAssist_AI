@@ -14,6 +14,7 @@ export const toolUseNames = [
 	"read_file",
 	"write_to_file",
 	"list_files",
+	"ask_followup_question",
 	"attempt_completion",
 ] as const;
 
@@ -53,6 +54,11 @@ export interface ReadFileToolUse extends ToolUse {
 export interface WriteToFileToolUse extends ToolUse {
 	name: "write_to_file";
 	params: Partial<Pick<Record<ToolParamName, string>, "path" | "content">>;
+}
+
+export interface AskFollowupQuestionToolUse extends ToolUse {
+	name: "ask_followup_question"
+	params: Partial<Pick<Record<ToolParamName, string>, "question">>
 }
 
 export interface AttemptCompletionToolUse extends ToolUse {

@@ -21,7 +21,9 @@ export const ExtensionContextProvider: React.FC<{ children: React.ReactNode }> =
 		assistantMessages: { [key: string]: any }[];
 		taskHistory: any[];
 	}>({
-		assistantMessages: [{ role: "assistant", content: "Hi! I am DevAssistAI." }],
+		assistantMessages: [{ role: "assistant", content: "Hi! I am DevAssistAI. test test test test test test test test test test test test " },
+			{ role: "User", content: "Hi! I am DevAssistAI. test test test test test test test test test test test test " }
+		],
 		taskHistory: [],
 	});
 
@@ -34,7 +36,7 @@ export const ExtensionContextProvider: React.FC<{ children: React.ReactNode }> =
 
 	const handleMessage = useCallback((event: MessageEvent) => {
 		const message: any = event.data;
-		console.log("message", message);
+		// console.log("message", message);
 		switch (message.type) {
 			// case "state": {
 			// 	setState(message.state!);
@@ -73,6 +75,10 @@ export const ExtensionContextProvider: React.FC<{ children: React.ReactNode }> =
 					show: false,
 					tool: "",
 				});
+				break;
+			}
+			case "askFollowup": {
+				console.log("partialMessage *******", message);
 				break;
 			}
 		}
