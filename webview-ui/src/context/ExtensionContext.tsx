@@ -93,6 +93,10 @@ export const ExtensionContextProvider: React.FC<{ children: React.ReactNode }> =
 				});
 				break;
 			}
+			case "askFollowup": {
+				console.log("partialMessage *******", message);
+				break;
+			}
 		}
 	}, []);
 
