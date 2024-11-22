@@ -4,13 +4,14 @@ import { vscode } from "../../utils/vscode";
 import { useExtension } from "../../context/ExtensionContext";
 
 const ChatInput = ({scrollChatViewToBottom, ...props}: any) => {
+    const [newTask, setNewTask] = useState(true);
     const [value, setValue] = useState("Create a python script for a simple calculator");
 
     const { apiConfiguration, addAssistantMessage } = useExtension();
 
     const handleSubmit = (event: any) => {
         event.preventDefault();
-        
+
         // Determine the API key based on the selected provider
         let apiKey = "";
         switch(apiConfiguration?.apiProvider) {
@@ -35,15 +36,13 @@ const ChatInput = ({scrollChatViewToBottom, ...props}: any) => {
             text: value,
             apiProvider: apiConfiguration?.apiProvider,
             apiKey: apiKey,
-            // apiKey:"AIzaSyDQZf0D36OtQewM0Rt6colKAnFAHll3Qs0",
+            newTask: newTask,
             modelId: apiConfiguration?.apiModelId // Include selected model ID
         });
-
-    
-        
-        // Clear input
         setValue("");
+        setNewTask(false);
     };
+
 
     return (
         <form onSubmit={handleSubmit}>

@@ -180,6 +180,17 @@ export class DevAssist {
 		}
 	}
 
+	async handleWebviewAskResponse(message: any) {
+		const text = message.text;
+		// this.askResponseText = text;
+		// await this.addToApiConversationHistory({ role: "user", content: this.askResponseText });
+		// await this.say("text", this.askResponseText);
+		const didEndLoop = this.recursivelyMakeClaudeRequests([{ type: "text", text }], false);
+		// this.receivedResponse = true;
+		
+
+	}
+
 	async presentAssistantMessage() {
 		const block = cloneDeep(this.assistantMessageContent[this.currentStreamingContentIndex]); // need to create copy bc while stream is updating the array, it could be updating the reference block properties too
 		console.log("block", block);
