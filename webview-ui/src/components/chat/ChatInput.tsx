@@ -4,6 +4,7 @@ import { vscode } from "../../utils/vscode";
 import { useExtension } from "../../context/ExtensionContext";
 
 const ChatInput = ({scrollChatViewToBottom, ...props}: any) => {
+	const [newTask, setNewTask] = useState(true);
 	const [value, setValue] = useState("Create a python script for a simple calculator");
 
 	const { addAssistantMessage } = useExtension();
@@ -15,10 +16,12 @@ const ChatInput = ({scrollChatViewToBottom, ...props}: any) => {
 		vscode.postMessage({
 			type: "askQuestion",
 			// askResponse: "messageResponse",
+			newTask: newTask,
 			text: value,
 			// images,
 		});
 		setValue("");
+		setNewTask(false);
 	};
 
 	return (

@@ -4,7 +4,7 @@ import UserMessage from "./UserMessage";
 
 const ChatContainer = () => {
 	const { showThinking, showToolInUse, assistantMessages } = useExtension();
-	console.log(assistantMessages);
+	// console.log(assistantMessages);
 	return (
 		// generate the chat container using the system message and user message components
 		<div style={{ width: "100%" }}>

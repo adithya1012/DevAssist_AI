@@ -1,4 +1,5 @@
 import * as vscode from "vscode";
+import pWaitFor from "p-wait-for";
 import { DevAssistProvider } from "./webview/DevAssistProvider";
 import { ApiConfiguration } from "../shared/api";
 import { ApiHandler, createApiHandler } from "../api";
@@ -27,6 +28,10 @@ export class DevAssist {
 	didCompleteReadingStream: boolean = false;
 	userMessageContent: any[] = [];
 	currentStreamingContentIndex = 0; // TODO: update index of the current content being streamed
+	askFollowup: boolean = false; // this is the variable that will be used to determine if ask_followup_question 
+	askFollowupIndex: number = 0;
+	askResponseText: string|undefined = "";
+	receivedResponse: boolean = false;
 
 	// Flags to keep track of the state of the tool use in current task to send events to the webview
 	isThinking = false;
@@ -46,7 +51,7 @@ export class DevAssist {
 		const sayTs = Date.now();
 		this.lastMessageTs = sayTs;
 		await this.addToMessages({ ts: sayTs, type: "say", say: type, text }); // Message will be updated.
-		console.log("Calling postStateToWebview");
+		// console.log("Calling postStateToWebview");
 		await this.providerRef.deref()?.postStateToWebview();
 	}
 	private async addToMessages(message: any) {
@@ -120,28 +125,57 @@ export class DevAssist {
 			this.assistantMessageContent = [];
 			this.didCompleteReadingStream = false;
 			this.userMessageContent = [];
-
+			this.currentStreamingContentIndex = 0;
 			const stream = this.attemptApiRequest(-1); // TODO -1 is a placeholder for now. For multiple communication we need to replace it by last message index
 			let assistantMessage = "";
 			try {
 				for await (const chunk of stream) {
 					assistantMessage += chunk.text;
 					this.assistantMessageContent = parseAssistantMessage(assistantMessage);
+					if (this.assistantMessageContent[this.assistantMessageContent.length - 1].type === "tool_use" && this.assistantMessageContent[this.assistantMessageContent.length - 1].name === "ask_followup_question") {
+						this.askFollowup = true;
+						this.askFollowupIndex = this.assistantMessageContent.length - 1;
+					}
 					// console.log("assistantMessageContent", this.assistantMessageContent);
 					this.presentAssistantMessage();
 				}
 			} catch (error) {
+				console.error(error);
 				this.abortTask();
+			}
+
+			if (assistantMessage.length > 0) {
+				await this.addToApiConversationHistory({
+					role: "assistant",
+					content: [{ type: "text", text: assistantMessage }],
+				});
+			}
+			
+
+			if (this.askFollowup) {
+				const followupQuestion = this.assistantMessageContent[this.askFollowupIndex].params.question;
+				this.providerRef.deref()?.postMessageToWebview({
+					type: "hideThinking",
+				});
+				this.providerRef.deref()?.postMessageToWebview({
+					type: "systemMessage",
+					// thinking: true,
+					message: followupQuestion,
+				});
+				this.askFollowup = false;
+				// await pWaitFor(() => this.receivedResponse);
+				return false;
+				
 			}
 
 			this.didCompleteReadingStream = true;
 
 			let didEndLoop = false;
 			if (assistantMessage.length > 0) {
-				await this.addToApiConversationHistory({
-					role: "assistant",
-					content: [{ type: "text", text: assistantMessage }],
-				});
+				// await this.addToApiConversationHistory({
+				// 	role: "assistant",
+				// 	content: [{ type: "text", text: assistantMessage }],
+				// });
 
 				const didToolUse = this.assistantMessageContent.some((block) => block.type === "tool_use");
 				if (!didToolUse) {
@@ -179,10 +213,20 @@ export class DevAssist {
 			return true;
 		}
 	}
+	async handleWebviewAskResponse(message: any) {
+		const text = message.text;
+		// this.askResponseText = text;
+		// await this.addToApiConversationHistory({ role: "user", content: this.askResponseText });
+		// await this.say("text", this.askResponseText);
+		const didEndLoop = this.recursivelyMakeClaudeRequests([{ type: "text", text }], false);
+		// this.receivedResponse = true;
+		
+
+	}
 
 	async presentAssistantMessage() {
 		const block = cloneDeep(this.assistantMessageContent[this.currentStreamingContentIndex]); // need to create copy bc while stream is updating the array, it could be updating the reference block properties too
-		console.log("block", block);
+		// console.log("block", block);
 		if (!block) {
 			return;
 		}
@@ -230,6 +274,15 @@ export class DevAssist {
 					}
 				}
 				await this.say("text", content);
+				// console.log("content ####", content);
+				if (this.askFollowup) {
+					this.providerRef.deref()?.postMessageToWebview({
+						type: "systemMessage",
+						thinking: true,
+						message: content,
+					});
+				}
+
 				break;
 			}
 			case "tool_use":
