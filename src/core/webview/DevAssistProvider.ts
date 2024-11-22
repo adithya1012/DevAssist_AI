@@ -121,11 +121,10 @@ export class DevAssistProvider implements vscode.WebviewViewProvider {
 						await this.postMessageToWebview({ type: "extensionDidLaunch" });
 						break;
 					case "newTask":
-						await this.initNewTask(message.text);
+						await this.initNewTask(message);
 						break;
 					case "askQuestion":
-						// await this.askQuestion(message.text);
-						await this.initNewTask(message.text);
+						await this.initNewTask(message);
 						break;
 				}
 			},
@@ -134,21 +133,22 @@ export class DevAssistProvider implements vscode.WebviewViewProvider {
 		);
 	}
 
-	async initNewTask(task?: string, images?: string[]) {
+	async initNewTask(message?: any) {
+		const task = message?.text;
 		await this.clearTask();
 
 		// const apiProvider: ApiProvider = "openai";
 		const apiProvider: ApiProvider = "gemini";
 		const apiModelId: string = "";
-		const apiKey: string = "";
+		const apiKey: string = message.apiKey;
 		const anthropicBaseUrl: string = "";
 		const openAiBaseUrl: string = "";
 		const openAiApiKey: string = "";
 		const openAiModelId: string = "gpt-4o";
 		const ollamaModelId: string = "";
 		const ollamaBaseUrl: string = "";
-		const geminiApiKey: string = ""; // TODO: Right now we need to provide API key manuslly here. This should an UI input in future.
-
+		// const geminiApiKey: string = ""; // TODO: Right now we need to provide API key manuslly here. This should an UI input in future.
+		const geminiApiKey: string = message.apiKey;
 		this.devAssist = new DevAssist(
 			this,
 			{
@@ -169,6 +169,7 @@ export class DevAssistProvider implements vscode.WebviewViewProvider {
 
 	async askQuestion(text?: string) {
 		await this.devAssist?.say("text", text);
+		await this.postStateToWebview();
 	}
 
 	// Send any JSON serializable data to the react app
@@ -176,14 +177,25 @@ export class DevAssistProvider implements vscode.WebviewViewProvider {
 		await this.view?.webview.postMessage(message);
 	}
 
+	// async postStateToWebview() {
+	// 	this.postMessageToWebview({
+	// 		type: "state",
+	// 		state: {
+	// 			messages: this.devAssist?.messages || [],
+	// 		},
+
+	// 	});
+	// }
 	async postStateToWebview() {
-		this.postMessageToWebview({
+		const state = {
 			type: "state",
 			state: {
 				messages: this.devAssist?.messages || [],
 			},
-		});
+		};
+		await this.postMessageToWebview(state);
 	}
+	
 
 	/**
 	 * Defines and returns the HTML that should be rendered within the webview panel.

@@ -46,7 +46,7 @@ export class DevAssist {
 		const sayTs = Date.now();
 		this.lastMessageTs = sayTs;
 		await this.addToMessages({ ts: sayTs, type: "say", say: type, text }); // Message will be updated.
-		console.log("Calling postStateToWebview");
+		// console.log("Calling postStateToWebview");
 		await this.providerRef.deref()?.postStateToWebview();
 	}
 	private async addToMessages(message: any) {

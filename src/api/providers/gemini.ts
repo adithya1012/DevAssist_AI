@@ -14,6 +14,10 @@ export class GeminiHandler implements ApiHandler {
 			throw new Error("API key is required for Google Gemini");
 		}
 		this.options = options;
+	
+			// console.log("Received API Key:", options.geminiApiKey);
+		  
+		  
 		this.client = new GoogleGenerativeAI(options.geminiApiKey);
 	}
 

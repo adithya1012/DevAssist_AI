@@ -1,7 +1,7 @@
 import { Anthropic } from "@anthropic-ai/sdk";
 import OpenAI from "openai";
 import { ApiHandler } from "../";
-import { ApiHandlerOptions, ModelInfo, openAiDefaultModelId, OpenAiModelId, openAiModels } from "../../shared/api";
+import { ApiHandlerOptions, ModelInfo, openAiNativeDefaultModelId, OpenAiNativeModelId, openAiNativeModels } from "../../shared/api";
 import { convertToOpenAiMessages } from "../transform/openai-format";
 import { ApiStream } from "../transform/stream";
 
@@ -14,6 +14,7 @@ export class OpenAiHandler implements ApiHandler {
 		this.client = new OpenAI({
 			apiKey: this.options.openAiApiKey,
 		});
+		// console.log("gemini api key",this.options.openAiApiKey);
 	}
 
 	async *createMessage(systemPrompt: string, messages: Anthropic.Messages.MessageParam[]): ApiStream {
@@ -54,12 +55,12 @@ export class OpenAiHandler implements ApiHandler {
 		}
 	}
 
-	getModel(): { id: OpenAiModelId; info: ModelInfo } {
+	getModel(): { id: OpenAiNativeModelId; info: ModelInfo } {
 		const modelId = this.options.apiModelId;
-		if (modelId && modelId in openAiModels) {
-			const id = modelId as OpenAiModelId;
-			return { id, info: openAiModels[id] };
+		if (modelId && modelId in openAiNativeModels) {
+			const id = modelId as OpenAiNativeModelId;
+			return { id, info: openAiNativeModels[id] };
 		}
-		return { id: openAiDefaultModelId, info: openAiModels[openAiDefaultModelId] };
+		return { id: openAiNativeDefaultModelId, info: openAiNativeModels[openAiNativeDefaultModelId] };
 	}
 }

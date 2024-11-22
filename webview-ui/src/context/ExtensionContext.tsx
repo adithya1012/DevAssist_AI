@@ -2,27 +2,46 @@ import React, { createContext, useCallback, useContext, useEffect, useState } fr
 import { useEvent } from "react-use";
 import { vscode } from "../utils/vscode";
 import { findLastIndex } from "../../../src/shared/array";
+import {ExtensionState} from "../../../src/shared/ExtensionMessage"
 
-interface ExtensionContextType {
+
+import {
+	ApiConfiguration,
+	ModelInfo,
+
+} from "../../../src/shared/api"
+
+interface ExtensionContextType extends ExtensionState {
 	showWelcome: boolean;
 	showThinking: boolean;
 	showToolInUse: {
 		show: boolean;
 		tool: string;
 	};
+	apiConfiguration?: ApiConfiguration;
 	assistantMessages: { [key: string]: any }[];
 	addAssistantMessage: (message: any) => void;
+	setCustomInstructions: (value?: string) => void
+	setAlwaysAllowReadOnly: (value: boolean) => void
+	setShowAnnouncement: (value: boolean) => void
+	setApiConfiguration: (config: ApiConfiguration) => void
 }
 
 const ExtensionContext = createContext<ExtensionContextType | undefined>(undefined);
 
 export const ExtensionContextProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+
 	const [state, setState] = useState<{
 		assistantMessages: { [key: string]: any }[];
 		taskHistory: any[];
+		version: string;
+		shouldShowAnnouncement: boolean;
 	}>({
+		version: "",
 		assistantMessages: [{ role: "assistant", content: "Hi! I am DevAssistAI." }],
 		taskHistory: [],
+		shouldShowAnnouncement: false,
+
 	});
 
 	const [showWelcome, setShowWelcome] = useState(false);
@@ -34,7 +53,6 @@ export const ExtensionContextProvider: React.FC<{ children: React.ReactNode }> =
 
 	const handleMessage = useCallback((event: MessageEvent) => {
 		const message: any = event.data;
-		console.log("message", message);
 		switch (message.type) {
 			// case "state": {
 			// 	setState(message.state!);
@@ -81,7 +99,7 @@ export const ExtensionContextProvider: React.FC<{ children: React.ReactNode }> =
 	useEvent("message", handleMessage);
 
 	useEffect(() => {
-		console.log("Extension context provider mounted with webviewDidLaunch");
+		// console.log("Extension context provider mounted with webviewDidLaunch");
 		vscode.postMessage({ type: "webviewDidLaunch" });
 	}, []);
 	const addAssistantMessage = useCallback((message: string) => {
@@ -99,6 +117,10 @@ export const ExtensionContextProvider: React.FC<{ children: React.ReactNode }> =
 		showThinking,
 		showToolInUse,
 		addAssistantMessage,
+		setApiConfiguration: (value) => setState((prevState) => ({ ...prevState, apiConfiguration: value })),
+		setCustomInstructions: (value) => setState((prevState) => ({ ...prevState, customInstructions: value })),
+		setAlwaysAllowReadOnly: (value) => setState((prevState) => ({ ...prevState, alwaysAllowReadOnly: value })),
+		setShowAnnouncement: (value) => setState((prevState) => ({ ...prevState, shouldShowAnnouncement: value })),
 	};
 
 	return <ExtensionContext.Provider value={contextValue}>{children}</ExtensionContext.Provider>;
