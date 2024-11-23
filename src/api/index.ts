@@ -13,8 +13,10 @@ export interface ApiHandler {
 
 export function createApiHandler(config: ApiConfiguration): ApiHandler {
 	const { apiProvider, ...options } = config;
+	// console.log("apiProvider: ", apiProvider);
 
 	switch (apiProvider) {
+		
 		case "anthropic":
 			return new AnthropicHandler(options);
 		case "openai":

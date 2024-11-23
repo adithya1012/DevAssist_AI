@@ -33,7 +33,7 @@
     },
     "commands": [
       {
-        "command": "devassist_ai.buttonClicked",
+        "command": "devassist_ai.plusButtonClicked",
         "title": "New Task",
         "icon": "$(add)"
       },
@@ -52,7 +52,21 @@
         "title": "Open In New Tab",
         "category": "DevAssist AI"
       }
-    ]
+    ],
+    "menus": {
+      "view/title": [
+        {
+          "command": "devassist_ai.plusButtonClicked",
+          "group": "navigation@1",
+          "when": "view == devassist_ai.SidebarProvider"
+        },
+        {
+          "command": "devassist_ai.settingsButtonClicked",
+          "group": "navigation@4",
+          "when": "view == devassist_ai.SidebarProvider"
+        }
+      ]
+    }
   },
   "scripts": {
     "vscode:prepublish": "npm run package",
@@ -77,6 +91,7 @@
     "@google/generative-ai": "^0.21.0",
     "@types/clone-deep": "^4.0.4",
     "@vscode/codicons": "^0.0.36",
+    "all": "^0.0.0",
     "clone-deep": "^4.0.1",
     "default-shell": "^2.2.0",
     "delay": "^6.0.0",

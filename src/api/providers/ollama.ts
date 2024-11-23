@@ -1,7 +1,7 @@
 import { Anthropic } from "@anthropic-ai/sdk";
 import OpenAI from "openai";
 import { ApiHandler } from "../";
-import { ApiHandlerOptions, ModelInfo, openAiModelInfoDefaults } from "../../shared/api";
+import { ApiHandlerOptions, ModelInfo, openAiModelInfoSaneDefaults } from "../../shared/api";
 import { convertToOpenAiMessages } from "../transform/openai-format";
 import { ApiStream } from "../transform/stream";
 
@@ -43,7 +43,7 @@ export class OllamaHandler implements ApiHandler {
 	getModel(): { id: string; info: ModelInfo } {
 		return {
 			id: this.options.ollamaModelId || "",
-			info: openAiModelInfoDefaults,
+			info: openAiModelInfoSaneDefaults,
 		};
 	}
 }

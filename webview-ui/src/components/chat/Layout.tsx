@@ -15,7 +15,7 @@ const ChatLayout = () => {
     const scrollToBottom = () =>
     {
         if(viewport.current){
-            console.log(viewport.current!.scrollHeight)
+            // console.log(viewport.current!.scrollHeight)
             viewport.current!.scrollTo({ top: viewport.current!.scrollHeight, behavior: 'smooth' });
         }
     }
