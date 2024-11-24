@@ -16,6 +16,7 @@ export const toolUseNames = [
 	"list_files",
 	"ask_followup_question",
 	"attempt_completion",
+	"search_files", // Added "search_files" here
 ] as const;
 
 // Converts array of tool call names into a union type ("execute_command" | "read_file" | ...)
@@ -64,4 +65,10 @@ export interface AskFollowupQuestionToolUse extends ToolUse {
 export interface AttemptCompletionToolUse extends ToolUse {
 	name: "attempt_completion";
 	params: Partial<Pick<Record<ToolParamName, string>, "result" | "command">>;
+}
+
+// New interface for search_files
+export interface SearchFilesToolUse extends ToolUse {
+	name: "search_files";
+	params: Partial<Pick<Record<ToolParamName, string>, "regex" | "file_pattern" | "recursive">>;
 }

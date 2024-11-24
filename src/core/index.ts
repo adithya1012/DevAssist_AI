@@ -351,9 +351,58 @@ export class DevAssist {
 				// }
 				switch (block.name) {
 					case "read_file": {
-						//TODO: implement read_file
+						const relPath: string | undefined = block.params.path;
+					
+						// Validate the file path
+						if (!relPath) {
+							pushToolResult(await this.sayAndCreateMissingParamError("read_file", "path"));
+							break;
+						}
+					
+						const absolutePath = path.resolve(cwd, relPath);
+						try {
+							// Check if the file exists
+							await fs.access(absolutePath);
+					
+							// Read file content
+							const fileContent = await fs.readFile(absolutePath, "utf8");
+					
+							// Optional: Clean up special characters if needed
+							const cleanedContent = fileContent
+								.replace(/&gt;/g, ">")
+								.replace(/&lt;/g, "<")
+								.replace(/&quot;/g, '"');
+					
+							// Add result to messages or webview state
+							this.userMessageContent.push({
+								type: "text",
+								text: `Read file: ${relPath}`,
+							});
+							this.userMessageContent.push({
+								type: "text",
+								text: cleanedContent,
+							});
+					
+							// Optionally show file content in webview
+							this.providerRef.deref()?.postMessageToWebview({
+								type: "systemMessage",
+								message: `File content from ${relPath}:\n${cleanedContent}`,
+							});
+					
+						} catch (err: any) {
+							// Handle file read errors
+							const errorMessage = `Error reading file '${relPath}': ${err.message}`;
+							pushToolResult(errorMessage);
+					
+							this.userMessageContent.push({
+								type: "text",
+								text: errorMessage,
+							});
+						}
+					
 						break;
 					}
+					
 					case "execute_command": {
 						const command: string = block.params.command;
 						if (!command) {
@@ -397,6 +446,185 @@ export class DevAssist {
 						});
 						break;
 					}
+					case "search_files": {
+						const regexString: string | undefined = block.params.regex;
+						const filePattern: string | undefined = block.params.file_pattern;
+						const caseInsensitive = block.params.case_insensitive || false;
+						const fileExtensionFilter = block.params.file_extension || "*";
+						const maxResults = block.params.max_results || 100;
+					
+						// Validate regex parameter
+						if (!regexString) {
+							pushToolResult(await this.sayAndCreateMissingParamError("search_files", "regex"));
+							break;
+						}
+					
+						const searchRegex = new RegExp(regexString, caseInsensitive ? "gi" : "g");
+						const searchDirectory = filePattern ? path.resolve(cwd, filePattern) : cwd;
+					
+						try {
+							// Collect matching files
+							const matchedFiles: string[] = [];
+							const matches: { file: string; lines: string[] }[] = [];
+					
+							// Recursive function to scan files
+							const searchFilesRecursive = async (dir: string) => {
+								const entries = await fs.readdir(dir, { withFileTypes: true });
+								for (const entry of entries) {
+									const fullPath = path.join(dir, entry.name);
+					
+									if (entry.isDirectory()) {
+										// Recursively search subdirectories
+										await searchFilesRecursive(fullPath);
+									} else {
+										// Only process files matching the extension filter
+										if (fileExtensionFilter !== "*" && !entry.name.endsWith(fileExtensionFilter)) {
+											continue;
+										}
+										matchedFiles.push(fullPath);
+									}
+								}
+							};
+					
+							// Start searching files
+							await searchFilesRecursive(searchDirectory);
+					
+							let resultCount = 0;
+							for (const file of matchedFiles) {
+								if (resultCount >= maxResults) {
+									break;
+								}
+					
+								try {
+									const fileContent = await fs.readFile(file, "utf8");
+									const lines = fileContent.split("\n");
+									const matchingLines = lines.filter((line) => searchRegex.test(line));
+					
+									if (matchingLines.length > 0) {
+										const relativePath = path.relative(cwd, file);
+										matches.push({
+											file: relativePath,
+											lines: matchingLines.map((line) =>
+												line.replace(searchRegex, (match) => `**${match}**`)
+											),
+										});
+										resultCount += matchingLines.length;
+									}
+								} catch (err: any) {
+									this.userMessageContent.push({
+										type: "text",
+										text: `Error reading file '${file}': ${err.message}`,
+									});
+								}
+							}
+					
+							// Prepare results for display
+							if (matches.length === 0) {
+								this.userMessageContent.push({
+									type: "text",
+									text: `No matches found for regex '${regexString}'.`,
+								});
+							} else {
+								for (const match of matches) {
+									this.userMessageContent.push({
+										type: "text",
+										text: `Matches in file: ${match.file}`,
+									});
+									this.userMessageContent.push({
+										type: "text",
+										text: match.lines.join("\n"),
+									});
+								}
+							}
+					
+							this.providerRef.deref()?.postMessageToWebview({
+								type: "systemMessage",
+								message: matches.length
+									? `Found ${matches.length} matches for '${regexString}'.`
+									: `No matches found for '${regexString}'.`,
+							});
+						} catch (err: any) {
+							const errorMessage = `Error searching files in '${searchDirectory}': ${err.message}`;
+							pushToolResult(errorMessage);
+					
+							this.userMessageContent.push({
+								type: "text",
+								text: errorMessage,
+							});
+						}
+					
+						break;
+					}
+
+					case "list_files": {
+						const relPath: string | undefined = block.params.path;
+						const recursive = block.params.recursive === "true"; // Treat as boolean
+					
+						if (!relPath) {
+							pushToolResult(await this.sayAndCreateMissingParamError("list_files", "path"));
+							break;
+						}
+					
+						const absolutePath = path.resolve(cwd, relPath);
+						try {
+							// Check if the directory exists
+							await fs.access(absolutePath);
+					
+							// List files (recursively if needed)
+							const listFilesRecursively = async (directory: string): Promise<string[]> => {
+								const entries = await fs.readdir(directory, { withFileTypes: true });
+								const files = entries.filter((entry) => entry.isFile()).map((entry) => path.join(directory, entry.name));
+								if (recursive) {
+									const folders = entries.filter((entry) => entry.isDirectory());
+									for (const folder of folders) {
+										const folderPath = path.join(directory, folder.name);
+										files.push(...(await listFilesRecursively(folderPath)));
+									}
+								}
+								return files;
+							};
+					
+							const files = await listFilesRecursively(absolutePath);
+					
+							// Notify the user
+							if (files.length === 0) {
+								this.userMessageContent.push({
+									type: "text",
+									text: `The directory '${relPath}' is empty.`,
+								});
+							} else {
+								this.userMessageContent.push({
+									type: "text",
+									text: `Files in directory: ${relPath}`,
+								});
+								this.userMessageContent.push({
+									type: "text",
+									text: files.join("\n"),
+								});
+							}
+					
+							// Optionally show file list in webview
+							this.providerRef.deref()?.postMessageToWebview({
+								type: "systemMessage",
+								message: files.length > 0
+									? `Files in directory ${relPath}:\n${files.join("\n")}`
+									: `The directory '${relPath}' is empty.`,
+							});
+						} catch (err: any) {
+							// Handle errors
+							const errorMessage = `Error listing files in directory '${relPath}': ${err.message}`;
+							pushToolResult(errorMessage);
+							this.userMessageContent.push({
+								type: "text",
+								text: errorMessage,
+							});
+						}
+					
+						break;
+					}
+					
+					
+					
 					case "attempt_completion": {
 						this.providerRef.deref()?.postMessageToWebview({
 							type: "systemMessage",
