@@ -360,13 +360,14 @@ export class DevAssist {
 						}
 					
 						const absolutePath = path.resolve(cwd, relPath);
+						console.log("absolutePath", absolutePath);
 						try {
 							// Check if the file exists
 							await fs.access(absolutePath);
 					
 							// Read file content
 							const fileContent = await fs.readFile(absolutePath, "utf8");
-					
+							
 							// Optional: Clean up special characters if needed
 							const cleanedContent = fileContent
 								.replace(/&gt;/g, ">")
@@ -388,6 +389,18 @@ export class DevAssist {
 								type: "systemMessage",
 								message: `File content from ${relPath}:\n${cleanedContent}`,
 							});
+
+							// //read file in vscode
+							// vscode.workspace.openTextDocument(absolutePath).then((doc) => {
+							// 	vscode.window.showTextDocument(doc);
+							// });
+							
+							// //extract text from file
+							// let text = cleanedContent;
+							// // now execute the tool like normal
+							// const content = await extractTextFromFile(absolutePath)
+							// pushToolResult(content)
+							
 					
 						} catch (err: any) {
 							// Handle file read errors
