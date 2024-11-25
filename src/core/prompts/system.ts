@@ -63,6 +63,18 @@ Your file content here
 </content>
 </write_to_file>
 
+
+## list_files
+Description: Request to list files and directories within the specified directory. If recursive is true, it will list all files and directories recursively. If recursive is false or not provided, it will only list the top-level contents. Do not use this tool to confirm the existence of files you may have created, as the user will let you know if the files were created successfully or not.
+Parameters:
+- path: (required) The path of the directory to list contents for (relative to the current working directory ${cwd})
+- recursive: (optional) Whether to list files recursively. Use true for recursive listing, false or omit for top-level only.
+Usage:
+<list_files>
+<path>Directory path here</path>
+<recursive>true or false (optional)</recursive>
+</list_files>
+
 ## ask_followup_question
 Description: Ask the user a question to gather additional information needed to complete the task. This tool should be used when you encounter ambiguities, need clarification, or require more details to proceed effectively. It allows for interactive problem-solving by enabling direct communication with the user. Use this tool judiciously to maintain a balance between gathering necessary information and avoiding excessive back-and-forth.
 Parameters:

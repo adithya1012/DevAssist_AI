@@ -11,6 +11,7 @@ import cloneDeep from "clone-deep";
 import { formatResponse } from "./prompts/responses";
 import fs from "fs/promises";
 import { TerminalManager } from "../integrations/terminal/TerminalManager";
+import { extractTextFromFile } from "../integrations/misc/extract-text";
 
 const cwd =
 	vscode.workspace.workspaceFolders?.map((folder) => folder.uri.fsPath).at(0) ?? path.join(os.homedir(), "Desktop");
@@ -114,7 +115,7 @@ export class DevAssist {
 			type: "showThinking",
 		});
 		// TODO: FIXME: Environment is coming Undefined
-		// const environmentDetails = await this.loadContext(userContent, includeFileDetails)
+		// const environmentDetails = await this.loadContext(userContent, includeFileDetails);
 		const environmentDetails = "NONE";
 		// add environment details as its own text block, separate from tool results
 		userContent.push({ type: "text", text: environmentDetails });
@@ -358,16 +359,14 @@ export class DevAssist {
 							pushToolResult(await this.sayAndCreateMissingParamError("read_file", "path"));
 							break;
 						}
-					
+				
 						const absolutePath = path.resolve(cwd, relPath);
 						console.log("absolutePath", absolutePath);
-						try {
-							// Check if the file exists
-							await fs.access(absolutePath);
 					
-							// Read file content
-							const fileContent = await fs.readFile(absolutePath, "utf8");
-							
+						try {
+							// Use extractTextFromFile to read the file content
+							const fileContent = await extractTextFromFile(absolutePath);
+					
 							// Optional: Clean up special characters if needed
 							const cleanedContent = fileContent
 								.replace(/&gt;/g, ">")
@@ -389,18 +388,9 @@ export class DevAssist {
 								type: "systemMessage",
 								message: `File content from ${relPath}:\n${cleanedContent}`,
 							});
-
-							// //read file in vscode
-							// vscode.workspace.openTextDocument(absolutePath).then((doc) => {
-							// 	vscode.window.showTextDocument(doc);
-							// });
-							
-							// //extract text from file
-							// let text = cleanedContent;
-							// // now execute the tool like normal
-							// const content = await extractTextFromFile(absolutePath)
-							// pushToolResult(content)
-							
+					
+							// Push result for further processing
+							pushToolResult(cleanedContent);
 					
 						} catch (err: any) {
 							// Handle file read errors
@@ -415,6 +405,7 @@ export class DevAssist {
 					
 						break;
 					}
+					
 					
 					case "execute_command": {
 						const command: string = block.params.command;
