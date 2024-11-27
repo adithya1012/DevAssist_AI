@@ -115,8 +115,8 @@ export class DevAssist {
 			type: "showThinking",
 		});
 		// TODO: FIXME: Environment is coming Undefined
-		// const environmentDetails = await this.loadContext(userContent, includeFileDetails);
-		const environmentDetails = "NONE";
+		const environmentDetails = await this.loadContext(userContent, includeFileDetails);
+		// const environmentDetails = "NONE";
 		// add environment details as its own text block, separate from tool results
 		userContent.push({ type: "text", text: environmentDetails });
 
@@ -131,14 +131,24 @@ export class DevAssist {
 			let assistantMessage = "";
 			try {
 				for await (const chunk of stream) {
+
 					assistantMessage += chunk.text;
 					this.assistantMessageContent = parseAssistantMessage(assistantMessage);
 					if (this.assistantMessageContent[this.assistantMessageContent.length - 1].type === "tool_use" && this.assistantMessageContent[this.assistantMessageContent.length - 1].name === "ask_followup_question") {
 						this.askFollowup = true;
 						this.askFollowupIndex = this.assistantMessageContent.length - 1;
 					}
-					// console.log("assistantMessageContent", this.assistantMessageContent);
+					if (this.assistantMessageContent[this.assistantMessageContent.length - 1].partial === true && this.assistantMessageContent[this.assistantMessageContent.length - 1].type === "text" && this.assistantMessageContent[this.assistantMessageContent.length - 1].content === '') {
+					// remove that element from the array becaus it is partial content
+					this.assistantMessageContent.pop();
+					}
+
 					this.presentAssistantMessage();
+
+					
+					// console.log("assistantMessageContent", this.assistantMessageContent);
+
+
 				}
 			} catch (error) {
 				console.error(error);
@@ -226,7 +236,8 @@ export class DevAssist {
 	}
 
 	async presentAssistantMessage() {
-		const block = cloneDeep(this.assistantMessageContent[this.currentStreamingContentIndex]); // need to create copy bc while stream is updating the array, it could be updating the reference block properties too
+		const block = cloneDeep(this.assistantMessageContent[this.currentStreamingContentIndex]);
+		// const block = cloneDeep(this.assistantMessageContent[this.assistantMessageContent.length - 1]); // need to create copy bc while stream is updating the array, it could be updating the reference block properties too
 		// console.log("block", block);
 		if (!block) {
 			return;
@@ -365,7 +376,8 @@ export class DevAssist {
 					
 						try {
 							// Use extractTextFromFile to read the file content
-							const fileContent = await extractTextFromFile(absolutePath);
+							// const fileContent = await extractTextFromFile(absolutePath);
+							const fileContent = await fs.readFile(absolutePath, "utf8");
 					
 							// Optional: Clean up special characters if needed
 							const cleanedContent = fileContent
@@ -384,16 +396,18 @@ export class DevAssist {
 							});
 					
 							// Optionally show file content in webview
-							this.providerRef.deref()?.postMessageToWebview({
-								type: "systemMessage",
-								message: `File content from ${relPath}:\n${cleanedContent}`,
-							});
+							// this.providerRef.deref()?.postMessageToWebview({
+							// 	type: "systemMessage",
+							// 	message: `File content from ${relPath}:\n${cleanedContent}`,
+							// });
 					
 							// Push result for further processing
 							pushToolResult(cleanedContent);
+							this.recursivelyMakeClaudeRequests(this.userMessageContent, false); // TODO: This code need to be replaced with the user permission from Nidhi's UI code integration.
 					
 						} catch (err: any) {
 							// Handle file read errors
+							console.error(err);
 							const errorMessage = `Error reading file '${relPath}': ${err.message}`;
 							pushToolResult(errorMessage);
 					
@@ -645,6 +659,13 @@ export class DevAssist {
 		}
 		if (!block.partial) {
 			this.currentStreamingContentIndex++;
+			if (this.currentStreamingContentIndex < this.assistantMessageContent.length) {
+				// there are already more content blocks to stream, so we'll call this function ourselves
+				// await this.presentAssistantContent()
+
+				this.presentAssistantMessage();
+				return;
+			}
 		}
 	}
 
@@ -685,7 +706,7 @@ export class DevAssist {
 	}
 
 	async loadContext(userContent: any, includeFileDetails: boolean = false) {
-		this.getEnvironmentDetails(includeFileDetails);
+		return this.getEnvironmentDetails(includeFileDetails);
 	}
 
 	async getEnvironmentDetails(includeFileDetails: boolean = false) {

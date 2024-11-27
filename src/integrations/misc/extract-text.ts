@@ -1,36 +1,59 @@
 import * as path from "path";
+// @ts-ignore-next-line
+import pdf from "pdf-parse/lib/pdf-parse";
+import mammoth from "mammoth";
 import fs from "fs/promises";
 import { isBinaryFile } from "isbinaryfile";
 
-/**
- * Reads the content of any file and returns it as a string.
- * Throws an error if the file is binary or cannot be read.
- *
- * @param filePath - The path to the file.
- * @returns The content of the file as a string.
- */
 export async function extractTextFromFile(filePath: string): Promise<string> {
+	try {
+		await fs.access(filePath);
+	} catch (error) {
+		throw new Error(`File not found: ${filePath}`);
+	}
     try {
-        // Check if the file exists
-        await fs.access(filePath);
-    } catch (error) {
-        throw new Error(`File not found: ${filePath}`);
-    }
+	// const fileExtension = path.extname(filePath).toLowerCase();
+	// switch (fileExtension) {
+	// 	case ".pdf":
+	// 		return extractTextFromPDF(filePath);
+	// 	case ".docx":
+	// 		return extractTextFromDOCX(filePath);
+	// 	case ".ipynb":
+	// 		return extractTextFromIPYNB(filePath);
+	// 	default:
+			const isBinary = await isBinaryFile(filePath).catch(() => false);
+			if (!isBinary) {
+				return await fs.readFile(filePath, "utf8");
+			} else {
+				throw new Error(`Cannot read text`);
+			}
+	// }
+} catch (error) {
+    throw new Error(`File not found: ${filePath}`);
+}
+}
 
-    // Get the file extension (not strictly necessary but might be useful for debugging/logging)
-    const fileExtension = path.extname(filePath).toLowerCase();
+async function extractTextFromPDF(filePath: string): Promise<string> {
+	const dataBuffer = await fs.readFile(filePath);
+	const data = await pdf(dataBuffer);
+	return data.text;
+}
 
-    try {
-        // Check if the file is binary
-        const isBinary = await isBinaryFile(filePath).catch(() => false);
+async function extractTextFromDOCX(filePath: string): Promise<string> {
+	const result = await mammoth.extractRawText({ path: filePath });
+	return result.value;
+}
 
-        if (!isBinary) {
-            // Read and return the content of the file as text
-            return await fs.readFile(filePath, "utf8");
-        } else {
-            throw new Error(`Cannot read text from binary file type: ${fileExtension}`);
-        }
-    } catch (error) {
-        throw new Error(`Error reading file '${filePath}': ${error.message}`);
-    }
+async function extractTextFromIPYNB(filePath: string): Promise<string> {
+	const data = await fs.readFile(filePath, "utf8");
+	const notebook = JSON.parse(data);
+	let extractedText = "";
+
+	for (const cell of notebook.cells) {
+		if ((cell.cell_type === "markdown" || cell.cell_type === "code") && cell.source) {
+			extractedText += cell.source.join("\n") + "\n";
+		}
+	}
+
+	return extractedText;
 }
