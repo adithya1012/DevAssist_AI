@@ -5,7 +5,7 @@ import { useExtension } from "../../context/ExtensionContext";
 
 const ChatInput = ({scrollChatViewToBottom, ...props}: any) => {
     const [newTask, setNewTask] = useState(true);
-    const [value, setValue] = useState("Create a python script for a simple calculator");
+    const [value, setValue] = useState("this is some issue in the calculator.py. Can you fix it ?");
 
     const { apiConfiguration, addAssistantMessage } = useExtension();
 
