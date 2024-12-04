@@ -96,11 +96,13 @@
     "default-shell": "^2.2.0",
     "delay": "^6.0.0",
     "diff": "^5.2.0",
+    "globby": "^14.0.2",
+    "isbinaryfile": "^5.0.2",
+    "mammoth": "^1.8.0",
+    "node-sass": "^9.0.0",
     "openai": "^4.68.1",
     "os-name": "^6.0.0",
-    "p-wait-for": "^5.0.2",
-    "isbinaryfile": "^5.0.2",
-		"mammoth": "^1.8.0"
+    "p-wait-for": "^5.0.2"
   },
   "devDependencies": {
     "@types/diff": "^5.2.3",
