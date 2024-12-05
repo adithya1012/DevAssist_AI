@@ -208,7 +208,6 @@ export class DevAssistProvider implements vscode.WebviewViewProvider {
 		};
 		await this.postMessageToWebview(state);
 	}
-	
 
 	/**
 	 * Defines and returns the HTML that should be rendered within the webview panel.
