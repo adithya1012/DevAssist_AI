@@ -137,8 +137,9 @@ export class DevAssistProvider implements vscode.WebviewViewProvider {
 								await this.devAssist?.handleWebviewAskResponse(message);
 								break;
 						}
-
-						// this.devAssist?.handleWebviewAskResponse(message);
+						break;
+					case "permissionResponse":
+						this.devAssist?.handlePermissionResponse(message.response);
 						break;
 				}
 			},

@@ -1,5 +1,6 @@
 import { Button, Flex } from "@mantine/core";
 import { useExtension } from "../../context/ExtensionContext";
+import { vscode } from "../../utils/vscode";
 
 const ActionPermission = () => {
 
@@ -22,8 +23,18 @@ const ActionPermission = () => {
       direction="row"
       wrap="wrap"
     >
-                <Button onClick={() => console.log("Allow")}>Allow</Button>
-                <Button onClick={() => console.log("Deny")}>Deny</Button>
+                <Button onClick={() => {
+                    vscode.postMessage({
+                        type: "permissionResponse",
+                        response: "ACCEPTED",
+                    });
+                }}>Allow</Button>
+                <Button onClick={() => {
+                    vscode.postMessage({
+                        type: "permissionResponse",
+                        response: "DENIED",
+                    });
+                }}>Deny</Button>
                 </Flex>
         </div>
     )

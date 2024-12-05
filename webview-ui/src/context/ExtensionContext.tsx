@@ -108,11 +108,13 @@ export const ExtensionContextProvider: React.FC<{ children: React.ReactNode }> =
 				break;
 			}
 			case "requestPermission": {
+				console.log("requestPermission *******", message);
 				setRequestPermission({
 					show: true,
 					message: message.message,
 					type: message.permissionType
 				})
+				break;
 			}
 		}
 	}, []);
