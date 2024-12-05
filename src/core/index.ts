@@ -12,6 +12,7 @@ import { formatResponse } from "./prompts/responses";
 import fs from "fs/promises";
 import { TerminalManager } from "../integrations/terminal/TerminalManager";
 import { extractTextFromFile } from "../integrations/misc/extract-text";
+import { checkTerraformInstalled, checkGCPInstalled, checkGitinstalled, isGCloudLoggedIn } from "../utils/requirement";
 
 const cwd =
 	vscode.workspace.workspaceFolders?.map((folder) => folder.uri.fsPath).at(0) ?? path.join(os.homedir(), "Desktop");
@@ -33,6 +34,10 @@ export class DevAssist {
 	askFollowupIndex: number = 0;
 	askResponseText: string|undefined = "";
 	receivedResponse: boolean = false;
+	terraformInstalled: boolean = false;
+	gcpInstalled: boolean = false;
+	gitInstalled: boolean = false;
+	GCloudLoggedIn: boolean = false;
 
 	// Flags to keep track of the state of the tool use in current task to send events to the webview
 	isThinking = false;
@@ -362,6 +367,55 @@ export class DevAssist {
 				// 	});
 				// }
 				switch (block.name) {
+					case "deploy_to_cloud": {
+						// check for dependicies are installed or not
+						if (!this.terraformInstalled || !this.gcpInstalled || !this.gitInstalled) {
+						
+						checkTerraformInstalled().then((isInstalled) => {
+							if (isInstalled) {
+								this.terraformInstalled = true;
+							} else {
+								console.log('Terraform is not installed. Please install it to proceed.');
+								// TODO: Show message to user to install Terraform
+							}
+						});
+						checkGCPInstalled().then((isInstalled) => {
+							if (isInstalled) {
+								this.gcpInstalled = true;
+							} else {
+								console.log('Google Cloud SDK (gcloud) is not installed. Please install it to proceed.');
+								// TODO: Show message to user to install Gcloud
+								
+							}
+						});
+						checkGitinstalled().then((isInstalled) => {
+							if (isInstalled) {
+								this.gitInstalled = true;
+							} else {
+								console.log('Git is not installed. Please install it to proceed.');
+								// TODO: Show message to user to install Git
+								
+							}
+						});
+						if (!this.gcpInstalled) {
+						isGCloudLoggedIn().then((isLoggedIn) => {
+							if (isLoggedIn) {
+								this.GCloudLoggedIn = true;
+							} else {
+								console.log('Google Cloud SDK (gcloud) is not logged in. Please login to proceed.');
+								// TODO: Show message to user to login to Gcloud
+							}});
+						}
+						break;
+					}
+					else {
+
+						// All dependies are installed and user is logged in to gcloud
+						
+					
+					}
+					break;
+				}
 					case "read_file": {
 						const relPath: string | undefined = block.params.path;
 					
@@ -640,9 +694,6 @@ export class DevAssist {
 					
 						break;
 					}
-					
-					
-					
 					case "attempt_completion": {
 						this.providerRef.deref()?.postMessageToWebview({
 							type: "systemMessage",
