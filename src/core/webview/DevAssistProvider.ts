@@ -3,6 +3,7 @@ import { getNonce } from "./getNonce";
 import { getUri } from "./getUri";
 import { DevAssist } from "..";
 import { ApiProvider } from "../../shared/api";
+import { permission } from "process";
 
 export const GlobalFileNames = {
 	apiConversationHistory: "api_conversation_history.json",
@@ -208,7 +209,6 @@ export class DevAssistProvider implements vscode.WebviewViewProvider {
 		};
 		await this.postMessageToWebview(state);
 	}
-	
 
 	/**
 	 * Defines and returns the HTML that should be rendered within the webview panel.

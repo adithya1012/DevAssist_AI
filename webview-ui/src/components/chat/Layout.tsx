@@ -4,12 +4,13 @@ import ChatContainer from './ChatContainer';
 import ChatInput from './ChatInput';
 import { useExtension } from '../../context/ExtensionContext';
 import SystemMessage from './SystemMessage';
+import ActionPermission from './ActionPermission';
 
 
 
 const ChatLayout = () => {
 
-    const {assistantMessages, showThinking} = useExtension()
+    const {assistantMessages, showThinking, requestPermission} = useExtension()
     const viewport = useRef<HTMLDivElement>(null);
 
     const scrollToBottom = () =>
@@ -32,6 +33,7 @@ const ChatLayout = () => {
                 <ChatContainer />
             </ScrollArea>
 			{showThinking && <SystemMessage message={{ role: "assistant", content: "Thinking...." }} />}
+            {requestPermission.show && <ActionPermission />}
 
             <ChatInput scrollChatViewToBottom={scrollToBottom}/>
         </div>
