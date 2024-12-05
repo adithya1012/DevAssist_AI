@@ -12,6 +12,8 @@ import { formatResponse } from "./prompts/responses";
 import fs from "fs/promises";
 import { TerminalManager } from "../integrations/terminal/TerminalManager";
 import { extractTextFromFile } from "../integrations/misc/extract-text";
+import { arePathsEqual } from "../utils/path";
+import { listFiles } from "./tools/listFiles";
 
 const cwd =
 	vscode.workspace.workspaceFolders?.map((folder) => folder.uri.fsPath).at(0) ?? path.join(os.homedir(), "Desktop");
@@ -29,9 +31,9 @@ export class DevAssist {
 	didCompleteReadingStream: boolean = false;
 	userMessageContent: any[] = [];
 	currentStreamingContentIndex = 0; // TODO: update index of the current content being streamed
-	askFollowup: boolean = false; // this is the variable that will be used to determine if ask_followup_question 
+	askFollowup: boolean = false; // this is the variable that will be used to determine if ask_followup_question
 	askFollowupIndex: number = 0;
-	askResponseText: string|undefined = "";
+	askResponseText: string | undefined = "";
 	receivedResponse: boolean = false;
 
 	// Flags to keep track of the state of the tool use in current task to send events to the webview
@@ -127,28 +129,15 @@ export class DevAssist {
 			this.didCompleteReadingStream = false;
 			this.userMessageContent = [];
 			this.currentStreamingContentIndex = 0;
-			const stream = this.attemptApiRequest(-1); // TODO -1 is a placeholder for now. For multiple communication we need to replace it by last message index
+			const response = await this.attemptApiRequest(-1); // TODO -1 is a placeholder for now. For multiple communication we need to replace it by last message index
 			let assistantMessage = "";
 			try {
-				for await (const chunk of stream) {
-
-					assistantMessage += chunk.text;
+				if (response.content) {
+					assistantMessage = response.content;
 					this.assistantMessageContent = parseAssistantMessage(assistantMessage);
-					if (this.assistantMessageContent[this.assistantMessageContent.length - 1].type === "tool_use" && this.assistantMessageContent[this.assistantMessageContent.length - 1].name === "ask_followup_question") {
-						this.askFollowup = true;
-						this.askFollowupIndex = this.assistantMessageContent.length - 1;
-					}
-					if (this.assistantMessageContent[this.assistantMessageContent.length - 1].partial === true && this.assistantMessageContent[this.assistantMessageContent.length - 1].type === "text" && this.assistantMessageContent[this.assistantMessageContent.length - 1].content === '') {
-					// remove that element from the array becaus it is partial content
-					this.assistantMessageContent.pop();
-					}
-
-					this.presentAssistantMessage();
-
-					
-					// console.log("assistantMessageContent", this.assistantMessageContent);
-
-
+					this.assistantMessageContent.forEach(async (block) => {
+						await this.presentAssistantMessage(block);
+					});
 				}
 			} catch (error) {
 				console.error(error);
@@ -160,23 +149,6 @@ export class DevAssist {
 					role: "assistant",
 					content: [{ type: "text", text: assistantMessage }],
 				});
-			}
-			
-
-			if (this.askFollowup) {
-				const followupQuestion = this.assistantMessageContent[this.askFollowupIndex].params.question;
-				this.providerRef.deref()?.postMessageToWebview({
-					type: "hideThinking",
-				});
-				this.providerRef.deref()?.postMessageToWebview({
-					type: "systemMessage",
-					// thinking: true,
-					message: followupQuestion,
-				});
-				this.askFollowup = false;
-				// await pWaitFor(() => this.receivedResponse);
-				return false;
-				
 			}
 
 			this.didCompleteReadingStream = true;
@@ -231,14 +203,11 @@ export class DevAssist {
 		// await this.say("text", this.askResponseText);
 		const didEndLoop = this.recursivelyMakeClaudeRequests([{ type: "text", text }], false);
 		// this.receivedResponse = true;
-		
-
 	}
 
-	async presentAssistantMessage() {
-		const block = cloneDeep(this.assistantMessageContent[this.currentStreamingContentIndex]);
-		// const block = cloneDeep(this.assistantMessageContent[this.assistantMessageContent.length - 1]); // need to create copy bc while stream is updating the array, it could be updating the reference block properties too
-		// console.log("block", block);
+	async presentAssistantMessage(block: any) {
+		// const block = cloneDeep(this.assistantMessageContent[this.currentStreamingContentIndex]);
+
 		if (!block) {
 			return;
 		}
@@ -246,24 +215,8 @@ export class DevAssist {
 			case "text": {
 				let content = block.content;
 				if (content) {
-					const openTagRegex = /<thinking>\s?/g;
-					const closeTagRegex = /\s?<\/thinking>/g;
 					content = content.replace(/<thinking>\s?/g, "");
 					content = content.replace(/\s?<\/thinking>/g, "");
-
-					// if (!this.isThinking && openTagRegex.test(block.content)) {
-					// 	this.isThinking = true;
-					// 	this.providerRef.deref()?.postMessageToWebview({
-					// 		type: "showThinking",
-					// 	});
-					// }
-
-					// if (this.isThinking && closeTagRegex.test(block.content)) {
-					// 	this.isThinking = false;
-					// 	this.providerRef.deref()?.postMessageToWebview({
-					// 		type: "hideThinking",
-					// 	});
-					// }
 
 					const lastOpenBracketIndex = content.lastIndexOf("<");
 					if (lastOpenBracketIndex !== -1) {
@@ -286,7 +239,6 @@ export class DevAssist {
 					}
 				}
 				await this.say("text", content);
-				// console.log("content ####", content);
 				if (this.askFollowup) {
 					this.providerRef.deref()?.postMessageToWebview({
 						type: "systemMessage",
@@ -354,37 +306,29 @@ export class DevAssist {
 					);
 					return text.replace(tagRegex, "");
 				};
-				// if (!this.isToolInUse && block.name !== "attempt_completion") {
-				// 	this.isToolInUse = true;
-				// 	this.providerRef.deref()?.postMessageToWebview({
-				// 		type: "showToolInUse",
-				// 		toolName: block.name,
-				// 	});
-				// }
 				switch (block.name) {
 					case "read_file": {
 						const relPath: string | undefined = block.params.path;
-					
+
 						// Validate the file path
 						if (!relPath) {
 							pushToolResult(await this.sayAndCreateMissingParamError("read_file", "path"));
 							break;
 						}
-				
+
 						const absolutePath = path.resolve(cwd, relPath);
-						console.log("absolutePath", absolutePath);
-					
+
 						try {
 							// Use extractTextFromFile to read the file content
 							// const fileContent = await extractTextFromFile(absolutePath);
 							const fileContent = await fs.readFile(absolutePath, "utf8");
-					
+
 							// Optional: Clean up special characters if needed
 							const cleanedContent = fileContent
 								.replace(/&gt;/g, ">")
 								.replace(/&lt;/g, "<")
 								.replace(/&quot;/g, '"');
-					
+
 							// Add result to messages or webview state
 							this.userMessageContent.push({
 								type: "text",
@@ -394,33 +338,31 @@ export class DevAssist {
 								type: "text",
 								text: cleanedContent,
 							});
-					
+
 							// Optionally show file content in webview
 							// this.providerRef.deref()?.postMessageToWebview({
 							// 	type: "systemMessage",
 							// 	message: `File content from ${relPath}:\n${cleanedContent}`,
 							// });
-					
+
 							// Push result for further processing
 							pushToolResult(cleanedContent);
-							this.recursivelyMakeClaudeRequests(this.userMessageContent, false); // TODO: This code need to be replaced with the user permission from Nidhi's UI code integration.
-					
+							// this.recursivelyMakeClaudeRequests(this.userMessageContent, false); // TODO: This code need to be replaced with the user permission from Nidhi's UI code integration.
 						} catch (err: any) {
 							// Handle file read errors
 							console.error(err);
 							const errorMessage = `Error reading file '${relPath}': ${err.message}`;
 							pushToolResult(errorMessage);
-					
+
 							this.userMessageContent.push({
 								type: "text",
 								text: errorMessage,
 							});
 						}
-					
+
 						break;
 					}
-					
-					
+
 					case "execute_command": {
 						const command: string = block.params.command;
 						if (!command) {
@@ -429,6 +371,12 @@ export class DevAssist {
 						}
 						const [userRejected, result] = await this.executeCommandTool(command);
 						pushToolResult(result);
+						// Add result to messages
+						this.userMessageContent.push({
+							type: "text",
+							text: `Executed command: ${command}`,
+						});
+
 						break;
 					}
 					case "write_to_file": {
@@ -457,11 +405,20 @@ export class DevAssist {
 								.replace(/&lt;/g, "<")
 								.replace(/&quot;/g, '"');
 						}
+						const dirPath = path.dirname(absolutePath);
+
+						await fs.mkdir(dirPath, { recursive: true });
 
 						fs.writeFile(absolutePath, newContent, "utf8");
 						vscode.workspace.openTextDocument(absolutePath).then((doc) => {
 							vscode.window.showTextDocument(doc);
 						});
+						this.userMessageContent.push({
+							type: "text",
+							text: `Wrote to file: ${relPath}`,
+						});
+						// this.recursivelyMakeClaudeRequests(this.userMessageContent, false); // TODO: This code need to be replaced with the user permission from Nidhi's UI code integration.
+
 						break;
 					}
 					case "search_files": {
@@ -470,27 +427,27 @@ export class DevAssist {
 						const caseInsensitive = block.params.case_insensitive || false;
 						const fileExtensionFilter = block.params.file_extension || "*";
 						const maxResults = block.params.max_results || 100;
-					
+
 						// Validate regex parameter
 						if (!regexString) {
 							pushToolResult(await this.sayAndCreateMissingParamError("search_files", "regex"));
 							break;
 						}
-					
+
 						const searchRegex = new RegExp(regexString, caseInsensitive ? "gi" : "g");
 						const searchDirectory = filePattern ? path.resolve(cwd, filePattern) : cwd;
-					
+
 						try {
 							// Collect matching files
 							const matchedFiles: string[] = [];
 							const matches: { file: string; lines: string[] }[] = [];
-					
+
 							// Recursive function to scan files
 							const searchFilesRecursive = async (dir: string) => {
 								const entries = await fs.readdir(dir, { withFileTypes: true });
 								for (const entry of entries) {
 									const fullPath = path.join(dir, entry.name);
-					
+
 									if (entry.isDirectory()) {
 										// Recursively search subdirectories
 										await searchFilesRecursive(fullPath);
@@ -503,21 +460,21 @@ export class DevAssist {
 									}
 								}
 							};
-					
+
 							// Start searching files
 							await searchFilesRecursive(searchDirectory);
-					
+
 							let resultCount = 0;
 							for (const file of matchedFiles) {
 								if (resultCount >= maxResults) {
 									break;
 								}
-					
+
 								try {
 									const fileContent = await fs.readFile(file, "utf8");
 									const lines = fileContent.split("\n");
 									const matchingLines = lines.filter((line) => searchRegex.test(line));
-					
+
 									if (matchingLines.length > 0) {
 										const relativePath = path.relative(cwd, file);
 										matches.push({
@@ -535,7 +492,7 @@ export class DevAssist {
 									});
 								}
 							}
-					
+
 							// Prepare results for display
 							if (matches.length === 0) {
 								this.userMessageContent.push({
@@ -554,7 +511,7 @@ export class DevAssist {
 									});
 								}
 							}
-					
+
 							this.providerRef.deref()?.postMessageToWebview({
 								type: "systemMessage",
 								message: matches.length
@@ -564,34 +521,36 @@ export class DevAssist {
 						} catch (err: any) {
 							const errorMessage = `Error searching files in '${searchDirectory}': ${err.message}`;
 							pushToolResult(errorMessage);
-					
+
 							this.userMessageContent.push({
 								type: "text",
 								text: errorMessage,
 							});
 						}
-					
+
 						break;
 					}
 
 					case "list_files": {
 						const relPath: string | undefined = block.params.path;
 						const recursive = block.params.recursive === "true"; // Treat as boolean
-					
+
 						if (!relPath) {
 							pushToolResult(await this.sayAndCreateMissingParamError("list_files", "path"));
 							break;
 						}
-					
+
 						const absolutePath = path.resolve(cwd, relPath);
 						try {
 							// Check if the directory exists
 							await fs.access(absolutePath);
-					
+
 							// List files (recursively if needed)
 							const listFilesRecursively = async (directory: string): Promise<string[]> => {
 								const entries = await fs.readdir(directory, { withFileTypes: true });
-								const files = entries.filter((entry) => entry.isFile()).map((entry) => path.join(directory, entry.name));
+								const files = entries
+									.filter((entry) => entry.isFile())
+									.map((entry) => path.join(directory, entry.name));
 								if (recursive) {
 									const folders = entries.filter((entry) => entry.isDirectory());
 									for (const folder of folders) {
@@ -601,9 +560,9 @@ export class DevAssist {
 								}
 								return files;
 							};
-					
+
 							const files = await listFilesRecursively(absolutePath);
-					
+
 							// Notify the user
 							if (files.length === 0) {
 								this.userMessageContent.push({
@@ -620,14 +579,17 @@ export class DevAssist {
 									text: files.join("\n"),
 								});
 							}
-					
+
+							// this.recursivelyMakeClaudeRequests(this.userMessageContent, false); // TODO: This code need to be replaced with the user permission from Nidhi's UI code integration.
+
 							// Optionally show file list in webview
-							this.providerRef.deref()?.postMessageToWebview({
-								type: "systemMessage",
-								message: files.length > 0
-									? `Files in directory ${relPath}:\n${files.join("\n")}`
-									: `The directory '${relPath}' is empty.`,
-							});
+							// this.providerRef.deref()?.postMessageToWebview({
+							// 	type: "systemMessage",
+							// 	message:
+							// 		files.length > 0
+							// 			? `Files in directory ${relPath}:\n${files.join("\n")}`
+							// 			: `The directory '${relPath}' is empty.`,
+							// });
 						} catch (err: any) {
 							// Handle errors
 							const errorMessage = `Error listing files in directory '${relPath}': ${err.message}`;
@@ -637,12 +599,10 @@ export class DevAssist {
 								text: errorMessage,
 							});
 						}
-					
+
 						break;
 					}
-					
-					
-					
+
 					case "attempt_completion": {
 						this.providerRef.deref()?.postMessageToWebview({
 							type: "systemMessage",
@@ -650,29 +610,30 @@ export class DevAssist {
 						});
 						break;
 					}
+					case "ask_followup_question": {
+						const followupQuestion = block.params.question;
+						this.providerRef.deref()?.postMessageToWebview({
+							type: "hideThinking",
+						});
+						this.providerRef.deref()?.postMessageToWebview({
+							type: "systemMessage",
+							// thinking: true,
+							message: followupQuestion,
+						});
+						break;
+					}
 				}
-			// this.isToolInUse = false;
-			// this.providerRef.deref()?.postMessageToWebview({
-			// 	type: "hideToolInUse",
-			// 	toolName: block.name,
-			// });
-		}
-		if (!block.partial) {
-			this.currentStreamingContentIndex++;
-			if (this.currentStreamingContentIndex < this.assistantMessageContent.length) {
-				// there are already more content blocks to stream, so we'll call this function ourselves
-				// await this.presentAssistantContent()
 
-				this.presentAssistantMessage();
-				return;
-			}
+				if (block.name !== "ask_followup_question" && block.name !== "attempt_completion") {
+					this.recursivelyMakeClaudeRequests(this.userMessageContent, false);
+				}
 		}
 	}
 
 	async executeCommandTool(command: string): Promise<[boolean, string]> {
 		const terminalInfo = await this.terminalManager.getOrCreateTerminal(cwd);
 		terminalInfo.show(); // weird visual bug when creating new terminals (even manually) where there's an empty space at the top.
-		// const process = this.terminalManager.runCommand(terminalInfo, command)
+		// const process = this.terminalManager.runCommand(terminalInfo, command);
 		terminalInfo.sendText(command);
 		let result = "";
 		await process;
@@ -690,14 +651,11 @@ export class DevAssist {
 		}
 	}
 
-	async *attemptApiRequest(previousApiReqIndex: number): any {
+	async attemptApiRequest(previousApiReqIndex: number): Promise<any> {
 		try {
 			let systemPrompt = await SYSTEM_PROMPT(cwd);
-			const stream = this.api.createMessage(systemPrompt, this.apiConversationHistory);
-			const iterator = stream[Symbol.asyncIterator]();
-			const firstChunk = await iterator.next();
-			yield firstChunk.value;
-			yield* iterator;
+			const response = await this.api.createMessage(systemPrompt, this.apiConversationHistory);
+			return response;
 		} catch (error) {
 			console.error(error);
 			await this.say("api_req_retried");
@@ -737,6 +695,60 @@ export class DevAssist {
 		} else {
 			details += "\n(No open tabs)";
 		}
+
+		if (includeFileDetails) {
+			details += `\n\n# Current Working Directory (${cwd}) Files\n`;
+			const isDesktop = arePathsEqual(cwd, path.join(os.homedir(), "Desktop"));
+			if (isDesktop) {
+				// don't want to immediately access desktop since it would show permission popup
+				details += "(Desktop files not shown automatically. Use list_files to explore if needed.)";
+			} else {
+				const [files, didHitLimit] = await listFiles(cwd, true, 200);
+				const result = (cwd: string, files: string[], didHitLimit: boolean): string => {
+					const sorted = files
+						.map((file) => {
+							// convert absolute path to relative path
+							const relativePath = path.relative(cwd, file);
+							return file.endsWith("/") ? relativePath + "/" : relativePath;
+						})
+						// Sort so files are listed under their respective directories to make it clear what files are children of what directories. Since we build file list top down, even if file list is truncated it will show directories that cline can then explore further.
+						.sort((a, b) => {
+							const aParts = a.split("/"); // only works if we use toPosix first
+							const bParts = b.split("/");
+							for (let i = 0; i < Math.min(aParts.length, bParts.length); i++) {
+								if (aParts[i] !== bParts[i]) {
+									// If one is a directory and the other isn't at this level, sort the directory first
+									if (i + 1 === aParts.length && i + 1 < bParts.length) {
+										return -1;
+									}
+									if (i + 1 === bParts.length && i + 1 < aParts.length) {
+										return 1;
+									}
+									// Otherwise, sort alphabetically
+									return aParts[i].localeCompare(bParts[i], undefined, {
+										numeric: true,
+										sensitivity: "base",
+									});
+								}
+							}
+							// If all parts are the same up to the length of the shorter path,
+							// the shorter one comes first
+							return aParts.length - bParts.length;
+						});
+					if (didHitLimit) {
+						return `${sorted.join(
+							"\n"
+						)}\n\n(File list truncated. Use list_files on specific subdirectories if you need to explore further.)`;
+					} else if (sorted.length === 0 || (sorted.length === 1 && sorted[0] === "")) {
+						return "No files found.";
+					} else {
+						return sorted.join("\n");
+					}
+				};
+				details += result;
+			}
+		}
+		console.log("details", details);
 		return `<environment_details>\n${details.trim()}\n</environment_details>`;
 	}
 }
