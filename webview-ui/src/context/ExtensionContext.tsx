@@ -30,6 +30,7 @@ interface ExtensionContextType extends ExtensionState {
 		message: string;
 		type: string;
 	};
+	sendPermissionResponse: (response: string) => void;
 }
 
 const ExtensionContext = createContext<ExtensionContextType | undefined>(undefined);
@@ -134,6 +135,18 @@ export const ExtensionContextProvider: React.FC<{ children: React.ReactNode }> =
 			};
 		});
 	}, []);
+
+	const sendPermissionResponse = (response: string) => {
+		vscode.postMessage({
+			type: "permissionResponse",
+			response: response,
+		});
+		setRequestPermission({
+			show: false,
+			message: "",
+			type: ""
+		});
+	}
 	const contextValue: ExtensionContextType = {
 		...state,
 		showWelcome,
@@ -145,6 +158,7 @@ export const ExtensionContextProvider: React.FC<{ children: React.ReactNode }> =
 		setAlwaysAllowReadOnly: (value) => setState((prevState) => ({ ...prevState, alwaysAllowReadOnly: value })),
 		setShowAnnouncement: (value) => setState((prevState) => ({ ...prevState, shouldShowAnnouncement: value })),
 		requestPermission,
+		sendPermissionResponse
 	};
 
 	return <ExtensionContext.Provider value={contextValue}>{children}</ExtensionContext.Provider>;

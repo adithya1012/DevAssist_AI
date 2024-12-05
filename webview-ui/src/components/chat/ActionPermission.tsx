@@ -4,7 +4,7 @@ import { vscode } from "../../utils/vscode";
 
 const ActionPermission = () => {
 
-    const {requestPermission} = useExtension();
+    const {requestPermission, sendPermissionResponse} = useExtension();
 
     return (
         <div className="action-permission">
@@ -24,16 +24,10 @@ const ActionPermission = () => {
       wrap="wrap"
     >
                 <Button onClick={() => {
-                    vscode.postMessage({
-                        type: "permissionResponse",
-                        response: "ACCEPTED",
-                    });
-                }}>Allow</Button>
+                   sendPermissionResponse("ACCEPTED")
+                }}>Accept</Button>
                 <Button onClick={() => {
-                    vscode.postMessage({
-                        type: "permissionResponse",
-                        response: "DENIED",
-                    });
+                   sendPermissionResponse("DENIED")
                 }}>Deny</Button>
                 </Flex>
         </div>

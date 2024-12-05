@@ -336,7 +336,7 @@ export class DevAssist {
 							params: block.params,
 						});
 
-						pWaitFor(() => this.isToolUsePermissionRecieved, { interval: 100 });
+						await pWaitFor(() => this.isToolUsePermissionRecieved, { interval: 100 });
 						if (this.checkIfToolUsePermissionDenied()) {
 							this.userMessageContent.push({
 								type: "text",
@@ -419,6 +419,23 @@ export class DevAssist {
 						break;
 					}
 					case "write_to_file": {
+						this.providerRef.deref()?.postMessageToWebview({
+							type: "requestPermission",
+							message: "DevAssist needs permission to write to file. Do you want to proceed?",
+							permissionType: "write_to_file",
+							params: block.params,
+						});
+
+						await pWaitFor(() => this.isToolUsePermissionRecieved, { interval: 100 });
+						if (this.checkIfToolUsePermissionDenied()) {
+							this.userMessageContent.push({
+								type: "text",
+								text: `Permission denied for tool use: ${block.name}`,
+							});
+							this.resetToolUsePermission();
+							break;
+						}
+						this.resetToolUsePermission();
 						const relPath: string | undefined = block.params.path;
 						let newContent: string | undefined = block.params.content;
 						if (!relPath || !newContent) {
