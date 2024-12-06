@@ -96,6 +96,7 @@
     "default-shell": "^2.2.0",
     "delay": "^6.0.0",
     "diff": "^5.2.0",
+    "globby": "^14.0.2",
     "openai": "^4.68.1",
     "os-name": "^6.0.0",
     "p-wait-for": "^5.0.2",
