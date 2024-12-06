@@ -3,6 +3,7 @@ import { getNonce } from "./getNonce";
 import { getUri } from "./getUri";
 import { DevAssist } from "..";
 import { ApiProvider } from "../../shared/api";
+import { permission } from "process";
 
 export const GlobalFileNames = {
 	apiConversationHistory: "api_conversation_history.json",
@@ -136,8 +137,9 @@ export class DevAssistProvider implements vscode.WebviewViewProvider {
 								await this.devAssist?.handleWebviewAskResponse(message);
 								break;
 						}
-
-						// this.devAssist?.handleWebviewAskResponse(message);
+						break;
+					case "permissionResponse":
+						this.devAssist?.handlePermissionResponse(message.response);
 						break;
 				}
 			},
