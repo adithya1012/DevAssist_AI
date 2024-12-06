@@ -6,6 +6,7 @@ import { ApiHandler, createApiHandler } from "../api";
 import * as path from "path";
 import os from "os";
 import { SYSTEM_PROMPT } from "./prompts/system";
+import { DEPLOY_PROMPT } from "./prompts/deployment_prompt"; 
 import { AssistantMessageContent, parseAssistantMessage, ToolParamName, ToolUseName } from "./assistant-message";
 import cloneDeep from "clone-deep";
 import { formatResponse } from "./prompts/responses";
@@ -104,7 +105,7 @@ export class DevAssist {
 		includeFileDetails = false; // we only need file details the first time
 	}
 
-	async recursivelyMakeClaudeRequests(userContent: any, includeFileDetails: boolean = false): Promise<boolean> {
+	async recursivelyMakeClaudeRequests(userContent: any, includeFileDetails: boolean = false, deploy:boolean=false): Promise<boolean> {
 		if (this.abort) {
 			throw new Error("DevAssist instance aborted");
 		}
@@ -132,7 +133,13 @@ export class DevAssist {
 			this.didCompleteReadingStream = false;
 			this.userMessageContent = [];
 			this.currentStreamingContentIndex = 0;
-			const stream = this.attemptApiRequest(-1); // TODO -1 is a placeholder for now. For multiple communication we need to replace it by last message index
+			let stream;
+			if (deploy) {
+				stream = this.attemptApiRequest(true);
+			} else {
+				stream = this.attemptApiRequest();
+			};
+			
 			let assistantMessage = "";
 			try {
 				for await (const chunk of stream) {
@@ -407,12 +414,10 @@ export class DevAssist {
 							}});
 						}
 						break;
-					}
-					else {
-
+						}
+						else {
 						// All dependies are installed and user is logged in to gcloud
-						
-					
+						this.recursivelyMakeClaudeRequests(this.userMessageContent, false, true);
 					}
 					break;
 				}
@@ -741,9 +746,13 @@ export class DevAssist {
 		}
 	}
 
-	async *attemptApiRequest(previousApiReqIndex: number): any {
+	async *attemptApiRequest(deploy:boolean=false): any {
 		try {
 			let systemPrompt = await SYSTEM_PROMPT(cwd);
+			if (deploy) {
+				const deployPrompt = await DEPLOY_PROMPT("/Users/adithyasn7gmail.com/Desktop/PFW/DeepLearning/test/test-application-flask");
+				systemPrompt = `${deployPrompt}${systemPrompt}\n`;
+			}
 			const stream = this.api.createMessage(systemPrompt, this.apiConversationHistory);
 			const iterator = stream[Symbol.asyncIterator]();
 			const firstChunk = await iterator.next();
