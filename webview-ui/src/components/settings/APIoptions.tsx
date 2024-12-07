@@ -47,6 +47,7 @@ const ApiOptions: React.FC<ApiOptionsProps> = ({
 
   // Handle provider change and update available models
 	const handleInputChange = (field: keyof ApiConfiguration) => (event: any) => {
+		console.log("open ai api key",event.target.value);
 		setApiConfiguration({ ...apiConfiguration, [field]: event.target.value })
 	}
 
@@ -98,7 +99,7 @@ const ApiOptions: React.FC<ApiOptionsProps> = ({
   // Render the component
   return (
     <div className="api-options-container" style={{ display: "flex", flexDirection: "column", gap: 5 }}>
-    <h2 style={{ margin: 0 }}>Settings</h2>
+    {/* <h2 style={{ margin: 0 }}>Settings</h2> */}
     <div className="form-group" style={{ display: "flex", flexDirection: "column", gap: 5 }}>
       <label htmlFor="api-provider">
         <span style={{ fontWeight: 500 }}>API Provider</span>
@@ -148,10 +149,10 @@ const ApiOptions: React.FC<ApiOptionsProps> = ({
 		{selectedProvider === "openai-native" && (
 				<div>
 					<VSCodeTextField
-						value={apiConfiguration?.openAiNativeApiKey || ""}
+						value={apiConfiguration?.openAiApiKey || ""}
 						style={{ width: "100%" }}
 						type="password"
-						onInput={handleInputChange("openAiNativeApiKey")}
+						onInput={handleInputChange("openAiApiKey")}
 						placeholder="Enter API Key...">
 						<label>
 						<span style={{ fontWeight: 500 }}>OpenAI API Key</span>
@@ -165,7 +166,7 @@ const ApiOptions: React.FC<ApiOptionsProps> = ({
 							color: "var(--vscode-descriptionForeground)",
 						}}>
 						This key is stored locally and only used to make API requests from this extension.
-						{!apiConfiguration?.openAiNativeApiKey && (
+						{!apiConfiguration?.openAiApiKey && (
 							<VSCodeLink
 								href="https://platform.openai.com/api-keys"
 								style={{ display: "inline", fontSize: "inherit" }}>

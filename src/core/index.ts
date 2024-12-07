@@ -411,9 +411,10 @@ export class DevAssist {
 						const [userRejected, result] = await this.executeCommandTool(command);
 						pushToolResult(result);
 						// Add result to messages
+						console.log(result);
 						this.userMessageContent.push({
 							type: "text",
-							text: `Executed command: ${command}`,
+							text: `Executed command: ${command}, Result: ${result}`,	
 						});
 
 						break;
@@ -688,24 +689,48 @@ export class DevAssist {
 
 	async executeCommandTool(command: string): Promise<[boolean, string]> {
 		const terminalInfo = await this.terminalManager.getOrCreateTerminal(cwd);
-		terminalInfo.show(); // weird visual bug when creating new terminals (even manually) where there's an empty space at the top.
-		// const process = this.terminalManager.runCommand(terminalInfo, command);
+		terminalInfo.show();
 		terminalInfo.sendText(command);
-		let result = "";
-		await process;
-		let completed = true;
-		result = result.trim();
-		if (completed) {
-			return [false, `Command executed.${result.length > 0 ? `\nOutput:\n${result}` : ""}`];
-		} else {
-			return [
-				false,
-				`Command is still running in the user's terminal.${
-					result.length > 0 ? `\nHere's the output so far:\n${result}` : ""
-				}\n\nYou will be updated on the terminal status and new output in the future.`,
-			];
-		}
+	
+		return new Promise<[boolean, string]>((resolve, reject) => {
+			const outputChannel = vscode.window.createOutputChannel('Command Output');
+			
+			// Use child_process for more reliable output capturing
+			const { exec } = require('child_process');
+	
+			exec(command, { cwd }, (error: Error | null, stdout: string, stderr: string) => {
+				// Combine stdout and stderr
+				let fullOutput = '';
+				console.log('stdout:', stdout);
+				if (stdout) {
+					fullOutput += `Standard Output:\n${stdout}\n`;
+					outputChannel.appendLine(`Standard Output:\n${stdout}`);
+				}
+				
+				if (stderr) {
+					fullOutput += `Error Output:\n${stderr}\n`;
+					outputChannel.appendLine(`Error Output:\n${stderr}`);
+				}
+	
+				if (error) {
+					fullOutput += `Execution Error: ${error.message}\n`;
+					outputChannel.appendLine(`Execution Error: ${error.message}`);
+					
+					resolve([
+						false, 
+						fullOutput
+					]);
+				} else {
+					resolve([
+						true, 
+						fullOutput
+					]);
+				}
+			});
+		});
 	}
+
+	  
 
 	async attemptApiRequest(previousApiReqIndex: number): Promise<any> {
 		try {

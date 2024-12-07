@@ -3,11 +3,12 @@ import { useState } from "react";
 import { vscode } from "../../utils/vscode";
 import { useExtension } from "../../context/ExtensionContext";
 
+
 const ChatInput = ({ scrollChatViewToBottom, ...props }: any) => {
-	const [newTask, setNewTask] = useState(true);
+	// const [newTask, setNewTask] = useState(true);
 	const [value, setValue] = useState("Create a simple calculator app using HTML, CSS and JavaScript");
 
-	const { apiConfiguration, addAssistantMessage } = useExtension();
+	const { apiConfiguration, addAssistantMessage, newTask,setNewTask} = useExtension();
 
 	const handleSubmit = (event: any) => {
 		event.preventDefault();
@@ -19,14 +20,13 @@ const ChatInput = ({ scrollChatViewToBottom, ...props }: any) => {
 				apiKey = apiConfiguration?.geminiApiKey || "";
 				break;
 			case "openai-native":
-				apiKey = apiConfiguration?.openAiNativeApiKey || "";
+				apiKey = apiConfiguration?.openAiApiKey || "";
 				break;
 			// Add other providers as needed
 			default:
-				apiKey = "";
+				apiKey = apiConfiguration?.openAiApiKey || ""; //TODO : Sometimes, API provider is not being identified for OpenAI.
 		}
 
-		// console.log("Sending message with API key for provider:", apiConfiguration?.apiProvider);
 		// Add message to chat
 		addAssistantMessage(value);
 

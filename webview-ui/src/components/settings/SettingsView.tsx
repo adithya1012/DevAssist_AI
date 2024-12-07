@@ -1,14 +1,13 @@
 import { VSCodeButton, VSCodeCheckbox, VSCodeLink, VSCodeTextArea } from "@vscode/webview-ui-toolkit/react"
 import { memo, useEffect, useState } from "react"
 import { useExtension } from "../../context/ExtensionContext"
-// import { validateApiConfiguration, validateModelId } from "../../utils/validate"
 import { vscode } from "../../utils/vscode"
 import ApiOptions from "./APIoptions"
 
-const IS_DEV = false // FIXME: use flags when packaging
+const IS_DEV = false
 
 type SettingsViewProps = {
-	onDone: () => void
+	onDone: () => void // Add this prop type
 }
 
 const SettingsView = ({ onDone }: SettingsViewProps) => {
@@ -19,21 +18,23 @@ const SettingsView = ({ onDone }: SettingsViewProps) => {
 		setCustomInstructions,
 		alwaysAllowReadOnly,
 		setAlwaysAllowReadOnly,
-		
 	} = useExtension()
 	const [apiErrorMessage, setApiErrorMessage] = useState<string | undefined>(undefined)
 	const [modelIdErrorMessage, setModelIdErrorMessage] = useState<string | undefined>(undefined)
+
 	const handleSubmit = () => {
+		// Perform any necessary validation or state updates
+		// Then call onDone to close the settings view
+		
+		// Commented out validation for now
 		// const apiValidationResult = validateApiConfiguration(apiConfiguration)
 		// const modelIdValidationResult = validateModelId(apiConfiguration, openRouterModels)
 
-		// setApiErrorMessage(apiValidationResult)
-		// setModelIdErrorMessage(modelIdValidationResult)
 		// if (!apiValidationResult && !modelIdValidationResult) {
 		// 	vscode.postMessage({ type: "apiConfiguration", apiConfiguration })
 		// 	vscode.postMessage({ type: "customInstructions", text: customInstructions })
 		// 	vscode.postMessage({ type: "alwaysAllowReadOnly", bool: alwaysAllowReadOnly })
-		// 	onDone()
+		onDone(); // Call the onDone callback to close the settings
 		// }
 	}
 
@@ -41,18 +42,6 @@ const SettingsView = ({ onDone }: SettingsViewProps) => {
 		setApiErrorMessage(undefined)
 		setModelIdErrorMessage(undefined)
 	}, [apiConfiguration])
-
-	// validate as soon as the component is mounted
-	/*
-	useEffect will use stale values of variables if they are not included in the dependency array. so trying to use useEffect with a dependency array of only one value for example will use any other variables' old values. In most cases you don't want this, and should opt to use react-use hooks.
-	
-	useEffect(() => {
-		// uses someVar and anotherVar
-	// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [someVar])
-
-	If we only want to run code once on mount we can use react-use's useEffectOnce or useMount
-	*/
 
 	const handleResetState = () => {
 		vscode.postMessage({ type: "resetState" })
@@ -90,79 +79,6 @@ const SettingsView = ({ onDone }: SettingsViewProps) => {
 						apiErrorMessage={apiErrorMessage}
 						modelIdErrorMessage={modelIdErrorMessage}
 					/>
-				</div>
-
-				<div style={{ marginBottom: 5 }}>
-					<VSCodeTextArea
-						value={customInstructions ?? ""}
-						style={{ width: "100%" }}
-						rows={4}
-						placeholder={
-							'e.g. "Run unit tests at the end", "Use TypeScript with async/await", "Speak in Spanish"'
-						}
-						onInput={(e: any) => setCustomInstructions(e.target?.value ?? "")}>
-						<span style={{ fontWeight: "500" }}>Custom Instructions</span>
-					</VSCodeTextArea>
-					<p
-						style={{
-							fontSize: "12px",
-							marginTop: "5px",
-							color: "var(--vscode-descriptionForeground)",
-						}}>
-						These instructions are added to the end of the system prompt sent with every request.
-					</p>
-				</div>
-
-				<div style={{ marginBottom: 5 }}>
-					<VSCodeCheckbox
-						checked={alwaysAllowReadOnly}
-						onChange={(e: any) => setAlwaysAllowReadOnly(e.target.checked)}>
-						<span style={{ fontWeight: "500" }}>Always approve read-only operations</span>
-					</VSCodeCheckbox>
-					<p
-						style={{
-							fontSize: "12px",
-							marginTop: "5px",
-							color: "var(--vscode-descriptionForeground)",
-						}}>
-						When enabled, Cline will automatically view directory contents and read files without requiring
-						you to click the Approve button.
-					</p>
-				</div>
-
-				{IS_DEV && (
-					<>
-						<div style={{ marginTop: "10px", marginBottom: "4px" }}>Debug</div>
-						<VSCodeButton onClick={handleResetState} style={{ marginTop: "5px", width: "auto" }}>
-							Reset State
-						</VSCodeButton>
-						<p
-							style={{
-								fontSize: "12px",
-								marginTop: "5px",
-								color: "var(--vscode-descriptionForeground)",
-							}}>
-							This will reset all global state and secret storage in the extension.
-						</p>
-					</>
-				)}
-
-				<div
-					style={{
-						textAlign: "center",
-						color: "var(--vscode-descriptionForeground)",
-						fontSize: "12px",
-						lineHeight: "1.2",
-						marginTop: "auto",
-						padding: "10px 8px 15px 0px",
-					}}>
-					<p style={{ wordWrap: "break-word", margin: 0, padding: 0 }}>
-						If you have any questions or feedback, feel free to open an issue at{" "}
-						<VSCodeLink href="https://github.com/cline/cline" style={{ display: "inline" }}>
-							https://github.com/cline/cline
-						</VSCodeLink>
-					</p>
-					<p style={{ fontStyle: "italic", margin: "10px 0 0 0", padding: 0 }}>v{version}</p>
 				</div>
 			</div>
 		</div>

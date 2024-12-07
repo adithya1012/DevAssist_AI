@@ -25,6 +25,9 @@ interface ExtensionContextType extends ExtensionState {
 	setAlwaysAllowReadOnly: (value: boolean) => void
 	setShowAnnouncement: (value: boolean) => void
 	setApiConfiguration: (config: ApiConfiguration) => void
+	newTask: boolean;
+	setNewTask: (value: boolean) => void;
+	clearAssistantMessages: () => void;
 	requestPermission: {
 		show: boolean;
 		message: string;
@@ -56,6 +59,7 @@ export const ExtensionContextProvider: React.FC<{ children: React.ReactNode }> =
 		show: false,
 		tool: "",
 	});
+	const [newTask, setNewTask] = useState(true);
 	const [requestPermission, setRequestPermission] = useState({
 		show: false,
 		message: "",
@@ -152,7 +156,29 @@ export const ExtensionContextProvider: React.FC<{ children: React.ReactNode }> =
 		showWelcome,
 		showThinking,
 		showToolInUse,
+		newTask, // Expose `newTask`
+		setNewTask, // Expose `setNewTask`
 		addAssistantMessage,
+
+		clearAssistantMessages: () => {
+			setState((prevState) => {
+				console.log("Previous Assistant Messages:", prevState.assistantMessages);
+				
+				const newState = {
+					version: "",
+					assistantMessages: [{ role: "assistant", content: "Hi! I am DevAssistAI." }],
+					taskHistory: [],
+					shouldShowAnnouncement: false,
+				};
+		
+				// Use setTimeout to log after state update
+				setTimeout(() => {
+					console.log("New Assistant Messages:", newState.assistantMessages);
+				}, 0);
+		
+				return newState;
+			});
+		},
 		setApiConfiguration: (value) => setState((prevState) => ({ ...prevState, apiConfiguration: value })),
 		setCustomInstructions: (value) => setState((prevState) => ({ ...prevState, customInstructions: value })),
 		setAlwaysAllowReadOnly: (value) => setState((prevState) => ({ ...prevState, alwaysAllowReadOnly: value })),
