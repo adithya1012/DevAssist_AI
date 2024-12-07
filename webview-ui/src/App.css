@@ -36,3 +36,61 @@
     transform: rotate(360deg);
   }
 }
+
+/* Chat Bubble Styles */
+.message-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem; /* Reduced space between messages */
+}
+
+.message-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-start; /* Default alignment for system */
+}
+
+.message-row.user {
+  justify-content: flex-end; /* Align user message row to the right */
+}
+
+.message-bubble {
+  max-width: 80%; /* Reduced width of the bubble */
+  padding: 0.4rem 0.8rem; /* Compact padding */
+  border-radius: 1rem; /* Slightly smaller corner radius */
+  word-wrap: break-word;
+  margin: 0.3rem; /* Compact margin for spacing */
+  font-size: 0.9rem; /* Smaller font size */
+  position: relative; /* Needed for tails */
+}
+
+.message-bubble.user {
+  background-color: #007bff; /* Blue for user */
+  color: white;
+  margin-left: auto; /* Push bubble to the extreme right */
+  text-align: left; /* Text alignment inside the bubble */
+}
+
+.message-bubble.system {
+  background-color: #f1f1f1; /* White for system */
+  color: black;
+  margin-right: auto; /* Push bubble to the extreme left */
+  text-align: left; /* Text alignment inside the bubble */
+}
+
+/* Avatar and Name Styles */
+.avatar-container {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem; /* Space between avatar and name */
+  margin-bottom: 0.3rem; /* Space between avatar/name and message */
+}
+
+.avatar-container.user {
+  justify-content: flex-end; /* Align avatar and name to the right */
+}
+
+.avatar-container.system {
+  justify-content: flex-start; /* Align avatar and name to the left */
+}
+

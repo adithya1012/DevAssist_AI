@@ -9,6 +9,7 @@ import SettingsView from "./components/settings/SettingsView";
 import { useEvent } from "react-use";
 import { ExtensionMessage } from "../../src/shared/ExtensionMessage";
 
+
 function App() {
     const [showApiOptions, setShowApiOptions] = useState(true); // Start with APIOptions
     const [showSettings, setShowSettings] = useState(false); 
