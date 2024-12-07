@@ -20,6 +20,8 @@ export class OpenAiHandler implements ApiHandler {
 		this.client = new OpenAI({
 			apiKey: this.options.openAiApiKey,
 		});
+
+		console.log("Received API Key:", options.openAiApiKey);
 	}
 
 	async createMessage(systemPrompt: string, messages: Anthropic.Messages.MessageParam[]): Promise<any> {
