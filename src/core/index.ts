@@ -929,37 +929,6 @@ export class DevAssist {
 			const commands = `cd ${cwd}`;
 			const [commandRejected, commandResult] = await this.executeCommandTool_for_deploy(commands);
 		}
-
-		return new Promise<[boolean, string]>((resolve, reject) => {
-			const outputChannel = vscode.window.createOutputChannel("Command Output");
-
-			// Use child_process for more reliable output capturing
-			const { exec } = require("child_process");
-
-			exec(command, { cwd }, (error: Error | null, stdout: string, stderr: string) => {
-				// Combine stdout and stderr
-				let fullOutput = "";
-				console.log("stdout:", stdout);
-				if (stdout) {
-					fullOutput += `Standard Output:\n${stdout}\n`;
-					outputChannel.appendLine(`Standard Output:\n${stdout}`);
-				}
-
-				if (stderr) {
-					fullOutput += `Error Output:\n${stderr}\n`;
-					outputChannel.appendLine(`Error Output:\n${stderr}`);
-				}
-
-				if (error) {
-					fullOutput += `Execution Error: ${error.message}\n`;
-					outputChannel.appendLine(`Execution Error: ${error.message}`);
-
-					resolve([false, fullOutput]);
-				} else {
-					resolve([true, fullOutput]);
-				}
-			});
-		});
 	}
 
 	async attemptApiRequest(): Promise<any> {
