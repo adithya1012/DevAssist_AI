@@ -2,6 +2,7 @@
 // Import the module and reference it with the alias vscode in your code below
 import * as vscode from "vscode";
 import { DevAssistProvider } from "./core/webview/DevAssistProvider";
+import { DIFF_VIEW_URI_SCHEME } from "./core/editor/DiffViewProvider";
 
 let outputChannel: vscode.OutputChannel;
 
@@ -73,6 +74,15 @@ export function activate(context: vscode.ExtensionContext) {
 
 	context.subscriptions.push(
 		vscode.commands.registerCommand("devassist_ai.popoutButtonClicked", openDevAssistInNewTab)
+	);
+
+	const diffContentProvider = new (class implements vscode.TextDocumentContentProvider {
+		provideTextDocumentContent(uri: vscode.Uri): string {
+			return Buffer.from(uri.query, "base64").toString("utf-8");
+		}
+	})();
+	context.subscriptions.push(
+		vscode.workspace.registerTextDocumentContentProvider(DIFF_VIEW_URI_SCHEME, diffContentProvider)
 	);
 
 	context.subscriptions.push(

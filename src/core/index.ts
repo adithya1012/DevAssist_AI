@@ -14,6 +14,9 @@ import { TerminalManager } from "../integrations/terminal/TerminalManager";
 import { extractTextFromFile } from "../integrations/misc/extract-text";
 import { arePathsEqual } from "../utils/path";
 import { listFiles } from "./tools/listFiles";
+import { DiffViewProvider } from "./editor/DiffViewProvider";
+import { fileExistsAtPath } from "../utils/fs";
+import delay from "delay";
 
 const cwd =
 	vscode.workspace.workspaceFolders?.map((folder) => folder.uri.fsPath).at(0) ?? path.join(os.homedir(), "Desktop");
@@ -35,6 +38,9 @@ export class DevAssist {
 	askFollowupIndex: number = 0;
 	askResponseText: string | undefined = "";
 	receivedResponse: boolean = false;
+	private diffViewProvider: DiffViewProvider;
+
+	breakLoop: boolean = false;
 
 	// Flags to keep track of the state of the tool use in current task to send events to the webview
 	isThinking = false;
@@ -46,6 +52,7 @@ export class DevAssist {
 		this.providerRef = new WeakRef(provider);
 		this.api = createApiHandler(apiConfiguration);
 		this.taskId = Date.now().toString();
+		this.diffViewProvider = new DiffViewProvider(cwd);
 		this.startTask(task);
 	}
 
@@ -74,7 +81,7 @@ export class DevAssist {
 	async sayAndCreateMissingParamError(toolName: ToolUseName, paramName: string, relPath?: string) {
 		await this.say(
 			"error",
-			`Cline tried to use ${toolName}${
+			`Devassist tried to use ${toolName}${
 				relPath ? ` for '${relPath.toPosix()}'` : ""
 			} without value for required parameter '${paramName}'. Retrying...`
 		);
@@ -137,9 +144,18 @@ export class DevAssist {
 				if (response.content) {
 					assistantMessage = response.content;
 					this.assistantMessageContent = parseAssistantMessage(assistantMessage);
-					this.assistantMessageContent.forEach(async (block) => {
+					for (let i = 0; i < this.assistantMessageContent.length; i++) {
+						const block = this.assistantMessageContent[i];
 						await this.presentAssistantMessage(block);
-					});
+						if (block["name"] === "ask_followup_question" || block["name"] === "attempt_completion") {
+							this.breakLoop = true;
+						} else {
+							this.breakLoop = false;
+						}
+					}
+					if (!this.breakLoop) {
+						this.recursivelyMakeClaudeRequests(this.userMessageContent, false);
+					}
 				}
 			} catch (error) {
 				console.error(error);
@@ -269,7 +285,7 @@ export class DevAssist {
 
 				break;
 			}
-			case "tool_use":
+			case "tool_use": {
 				const toolDescription = () => {
 					switch (block.name) {
 						case "execute_command":
@@ -401,7 +417,6 @@ export class DevAssist {
 
 						break;
 					}
-
 					case "execute_command": {
 						const command: string = block.params.command;
 						if (!command) {
@@ -414,36 +429,17 @@ export class DevAssist {
 						console.log(result);
 						this.userMessageContent.push({
 							type: "text",
-							text: `Executed command: ${command}, Result: ${result}`,	
+							text: `Executed command: ${command}, Result: ${result}`,
 						});
 
 						break;
 					}
 					case "write_to_file": {
-						this.providerRef.deref()?.postMessageToWebview({
-							type: "requestPermission",
-							message: "DevAssist needs permission to write to file. Do you want to proceed?",
-							permissionType: "write_to_file",
-							params: block.params,
-						});
-
-						await pWaitFor(() => this.isToolUsePermissionRecieved, { interval: 100 });
-						if (this.checkIfToolUsePermissionDenied()) {
-							this.userMessageContent.push({
-								type: "text",
-								text: `Permission denied for tool use: ${block.name}`,
-							});
-							this.resetToolUsePermission();
-							break;
-						}
-						this.resetToolUsePermission();
 						const relPath: string | undefined = block.params.path;
 						let newContent: string | undefined = block.params.content;
 						if (!relPath || !newContent) {
 							break;
 						}
-						let fileExists: boolean = false;
-						const absolutePath = path.resolve(cwd, relPath);
 
 						if (newContent.startsWith("```")) {
 							newContent = newContent.split("\n").slice(1).join("\n").trim();
@@ -462,20 +458,56 @@ export class DevAssist {
 								.replace(/&lt;/g, "<")
 								.replace(/&quot;/g, '"');
 						}
-						const dirPath = path.dirname(absolutePath);
 
-						await fs.mkdir(dirPath, { recursive: true });
-
-						fs.writeFile(absolutePath, newContent, "utf8");
-						vscode.workspace.openTextDocument(absolutePath).then((doc) => {
-							vscode.window.showTextDocument(doc);
+						console.log(block);
+						console.log(relPath, newContent);
+						this.providerRef.deref()?.postMessageToWebview({
+							type: "requestPermission",
+							message: "DevAssist needs permission to write to file. Do you want to proceed?",
+							permissionType: "write_to_file",
+							params: block.params,
 						});
+
+						let fileExists: boolean;
+						const absolutePath = path.resolve(cwd, relPath);
+						fileExists = await fileExistsAtPath(absolutePath);
+						this.diffViewProvider.editType = fileExists ? "modify" : "create";
+
+						await this.diffViewProvider.open(relPath);
+						await this.diffViewProvider.update(newContent, true);
+						await delay(300); // wait for diff view to update
+						this.diffViewProvider.scrollToFirstDiff();
+
+						await pWaitFor(() => this.isToolUsePermissionRecieved, { interval: 100 });
+						if (this.checkIfToolUsePermissionDenied()) {
+							this.userMessageContent.push({
+								type: "text",
+								text: `Permission denied for tool use: ${block.name}`,
+							});
+							this.resetToolUsePermission();
+							await this.diffViewProvider.revertChanges();
+							await this.diffViewProvider.reset();
+							break;
+						}
+						this.resetToolUsePermission();
+						await this.diffViewProvider.saveChanges();
+
+						// const absolutePath = path.resolve(cwd, relPath);
+
+						// const dirPath = path.dirname(absolutePath);
+
+						// await fs.mkdir(dirPath, { recursive: true });
+
+						// fs.writeFile(absolutePath, newContent, "utf8");
+						// vscode.workspace.openTextDocument(absolutePath).then((doc) => {
+						// 	vscode.window.showTextDocument(doc);
+						// });
 						this.userMessageContent.push({
 							type: "text",
 							text: `Wrote to file: ${relPath}`,
 						});
 						// this.recursivelyMakeClaudeRequests(this.userMessageContent, false); // TODO: This code need to be replaced with the user permission from Nidhi's UI code integration.
-
+						await this.diffViewProvider.reset();
 						break;
 					}
 					case "search_files": {
@@ -587,7 +619,6 @@ export class DevAssist {
 
 						break;
 					}
-
 					case "list_files": {
 						const relPath: string | undefined = block.params.path;
 						const recursive = block.params.recursive === "true"; // Treat as boolean
@@ -659,7 +690,6 @@ export class DevAssist {
 
 						break;
 					}
-
 					case "attempt_completion": {
 						this.providerRef.deref()?.postMessageToWebview({
 							type: "systemMessage",
@@ -681,9 +711,8 @@ export class DevAssist {
 					}
 				}
 
-				if (block.name !== "ask_followup_question" && block.name !== "attempt_completion") {
-					this.recursivelyMakeClaudeRequests(this.userMessageContent, false);
-				}
+				break;
+			}
 		}
 	}
 
@@ -691,46 +720,38 @@ export class DevAssist {
 		const terminalInfo = await this.terminalManager.getOrCreateTerminal(cwd);
 		terminalInfo.show();
 		terminalInfo.sendText(command);
-	
+
 		return new Promise<[boolean, string]>((resolve, reject) => {
-			const outputChannel = vscode.window.createOutputChannel('Command Output');
-			
+			const outputChannel = vscode.window.createOutputChannel("Command Output");
+
 			// Use child_process for more reliable output capturing
-			const { exec } = require('child_process');
-	
+			const { exec } = require("child_process");
+
 			exec(command, { cwd }, (error: Error | null, stdout: string, stderr: string) => {
 				// Combine stdout and stderr
-				let fullOutput = '';
-				console.log('stdout:', stdout);
+				let fullOutput = "";
+				console.log("stdout:", stdout);
 				if (stdout) {
 					fullOutput += `Standard Output:\n${stdout}\n`;
 					outputChannel.appendLine(`Standard Output:\n${stdout}`);
 				}
-				
+
 				if (stderr) {
 					fullOutput += `Error Output:\n${stderr}\n`;
 					outputChannel.appendLine(`Error Output:\n${stderr}`);
 				}
-	
+
 				if (error) {
 					fullOutput += `Execution Error: ${error.message}\n`;
 					outputChannel.appendLine(`Execution Error: ${error.message}`);
-					
-					resolve([
-						false, 
-						fullOutput
-					]);
+
+					resolve([false, fullOutput]);
 				} else {
-					resolve([
-						true, 
-						fullOutput
-					]);
+					resolve([true, fullOutput]);
 				}
 			});
 		});
 	}
-
-	  
 
 	async attemptApiRequest(previousApiReqIndex: number): Promise<any> {
 		try {
@@ -792,7 +813,7 @@ export class DevAssist {
 							const relativePath = path.relative(cwd, file);
 							return file.endsWith("/") ? relativePath + "/" : relativePath;
 						})
-						// Sort so files are listed under their respective directories to make it clear what files are children of what directories. Since we build file list top down, even if file list is truncated it will show directories that cline can then explore further.
+						// Sort so files are listed under their respective directories to make it clear what files are children of what directories. Since we build file list top down, even if file list is truncated it will show directories that devassist can then explore further.
 						.sort((a, b) => {
 							const aParts = a.split("/"); // only works if we use toPosix first
 							const bParts = b.split("/");
