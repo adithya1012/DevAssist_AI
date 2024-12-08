@@ -5,7 +5,9 @@ import { useExtension } from "../../context/ExtensionContext";
 
 const ChatInput = ({ scrollChatViewToBottom, ...props }: any) => {
 	const [newTask, setNewTask] = useState(true);
-	const [value, setValue] = useState("Create a simple calculator app using HTML, CSS and JavaScript");
+	const [value, setValue] = useState(
+		"Give me a simple flask application which can work as a calculator. create a simple User interface to it. And deploy the application."
+	);
 
 	const { apiConfiguration, addAssistantMessage } = useExtension();
 
@@ -19,11 +21,11 @@ const ChatInput = ({ scrollChatViewToBottom, ...props }: any) => {
 				apiKey = apiConfiguration?.geminiApiKey || "";
 				break;
 			case "openai-native":
-				apiKey = apiConfiguration?.openAiNativeApiKey || "";
+				apiKey = apiConfiguration?.openAiApiKey || "";
 				break;
 			// Add other providers as needed
 			default:
-				apiKey = "";
+				apiKey = apiConfiguration?.openAiApiKey || "";
 		}
 
 		// console.log("Sending message with API key for provider:", apiConfiguration?.apiProvider);

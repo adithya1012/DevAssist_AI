@@ -150,7 +150,6 @@ export class DevAssistProvider implements vscode.WebviewViewProvider {
 		const task = message?.text;
 		await this.clearTask();
 
-		// const apiProvider: ApiProvider = "openai";
 		const apiProvider: ApiProvider = "gemini";
 		const apiModelId: string = "";
 		const apiKey: string = message.apiKey;
@@ -160,7 +159,7 @@ export class DevAssistProvider implements vscode.WebviewViewProvider {
 		const openAiModelId: string = "gpt-4o";
 		const ollamaModelId: string = "";
 		const ollamaBaseUrl: string = "";
-		// const geminiApiKey: string = ""; // TODO: Right now we need to provide API key manuslly here. This should an UI input in future.
+		// const geminiApiKey: string = "";
 		const geminiApiKey: string = message.apiKey;
 		this.devAssist = new DevAssist(
 			this,
