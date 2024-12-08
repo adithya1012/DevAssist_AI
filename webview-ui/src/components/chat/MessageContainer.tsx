@@ -1,17 +1,32 @@
-import { Avatar, Container, Flex } from "@mantine/core";
-import { useState } from "react";
+import React from "react";
+import { Avatar, Box } from "@mantine/core";
 
-const MessageContainer = ({ children, isSystemMessage, ...props }: any) => {
-
-    return (
-		<Container p="0" m="0" bg={isSystemMessage ? "var(--mantine-color-dark-6)" : ""} fluid>
-			<Flex justify="flex-start" align="center">
-				<Avatar variant="transparent" radius="sm" size="md" src={""} color="white" />
-				{isSystemMessage ? <span>DevAssist</span> : <span>User</span>}
-			</Flex>
-			{children}
-		</Container>
-	);
+const MessageContainer = ({ children, isSystemMessage }: any) => {
+  return (
+    <div>
+      {/* Avatar and Name */}
+      <div
+        className={`avatar-container ${
+          isSystemMessage ? "system" : "user"
+        }`}
+      >
+        <Avatar
+          radius="xl"
+          size="sm"
+          color={isSystemMessage ? "blue" : "gray"}
+        />
+        <Box style={{ fontWeight: "bold", fontSize: "0.85rem" }}>
+          {isSystemMessage ? "DevAssist" : "User"}
+        </Box>
+      </div>
+      {/* Message Bubble */}
+      <div
+        className={`message-bubble ${isSystemMessage ? "system" : "user"}`}
+      >
+        {children}
+      </div>
+    </div>
+  );
 };
 
 export default MessageContainer;
