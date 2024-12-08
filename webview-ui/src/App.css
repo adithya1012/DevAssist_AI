@@ -55,7 +55,7 @@
 }
 
 .message-bubble {
-  max-width: 80%; /* Reduced width of the bubble */
+  max-width: 95%; /* Reduced width of the bubble */
   padding: 0.4rem 0.8rem; /* Compact padding */
   border-radius: 1rem; /* Slightly smaller corner radius */
   word-wrap: break-word;
