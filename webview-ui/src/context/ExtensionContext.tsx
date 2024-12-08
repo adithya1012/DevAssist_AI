@@ -25,6 +25,15 @@ interface ExtensionContextType extends ExtensionState {
 	setAlwaysAllowReadOnly: (value: boolean) => void
 	setShowAnnouncement: (value: boolean) => void
 	setApiConfiguration: (config: ApiConfiguration) => void
+	newTask: boolean;
+	setNewTask: (value: boolean) => void;
+	clearAssistantMessages: () => void;
+	requestPermission: {
+		show: boolean;
+		message: string;
+		type: string;
+	};
+	sendPermissionResponse: (response: string) => void;
 }
 
 const ExtensionContext = createContext<ExtensionContextType | undefined>(undefined);
@@ -49,6 +58,12 @@ export const ExtensionContextProvider: React.FC<{ children: React.ReactNode }> =
 	const [showToolInUse, setShowToolInUse] = useState({
 		show: false,
 		tool: "",
+	});
+	const [newTask, setNewTask] = useState(true);
+	const [requestPermission, setRequestPermission] = useState({
+		show: false,
+		message: "",
+		type: ""
 	});
 
 	const handleMessage = useCallback((event: MessageEvent) => {
@@ -97,6 +112,15 @@ export const ExtensionContextProvider: React.FC<{ children: React.ReactNode }> =
 				console.log("partialMessage *******", message);
 				break;
 			}
+			case "requestPermission": {
+				console.log("requestPermission *******", message);
+				setRequestPermission({
+					show: true,
+					message: message.message,
+					type: message.permissionType
+				})
+				break;
+			}
 		}
 	}, []);
 
@@ -115,16 +139,52 @@ export const ExtensionContextProvider: React.FC<{ children: React.ReactNode }> =
 			};
 		});
 	}, []);
+
+	const sendPermissionResponse = (response: string) => {
+		vscode.postMessage({
+			type: "permissionResponse",
+			response: response,
+		});
+		setRequestPermission({
+			show: false,
+			message: "",
+			type: ""
+		});
+	}
 	const contextValue: ExtensionContextType = {
 		...state,
 		showWelcome,
 		showThinking,
 		showToolInUse,
+		newTask, // Expose `newTask`
+		setNewTask, // Expose `setNewTask`
 		addAssistantMessage,
+
+		clearAssistantMessages: () => {
+			setState((prevState) => {
+				console.log("Previous Assistant Messages:", prevState.assistantMessages);
+				
+				const newState = {
+					version: "",
+					assistantMessages: [{ role: "assistant", content: "Hi! I am DevAssistAI." }],
+					taskHistory: [],
+					shouldShowAnnouncement: false,
+				};
+		
+				// Use setTimeout to log after state update
+				setTimeout(() => {
+					console.log("New Assistant Messages:", newState.assistantMessages);
+				}, 0);
+		
+				return newState;
+			});
+		},
 		setApiConfiguration: (value) => setState((prevState) => ({ ...prevState, apiConfiguration: value })),
 		setCustomInstructions: (value) => setState((prevState) => ({ ...prevState, customInstructions: value })),
 		setAlwaysAllowReadOnly: (value) => setState((prevState) => ({ ...prevState, alwaysAllowReadOnly: value })),
 		setShowAnnouncement: (value) => setState((prevState) => ({ ...prevState, shouldShowAnnouncement: value })),
+		requestPermission,
+		sendPermissionResponse
 	};
 
 	return <ExtensionContext.Provider value={contextValue}>{children}</ExtensionContext.Provider>;

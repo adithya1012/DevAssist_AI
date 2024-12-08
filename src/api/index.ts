@@ -18,7 +18,7 @@ export function createApiHandler(config: ApiConfiguration): ApiHandler {
 	switch (apiProvider) {
 		// case "anthropic":
 		// 	return new AnthropicHandler(options);
-		case "openai":
+		case "openai-native":
 			return new OpenAiHandler(options);
 		case "gemini":
 			return new GeminiHandler(options);

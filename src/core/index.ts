@@ -57,6 +57,8 @@ export class DevAssist {
 	// Flags to keep track of the state of the tool use in current task to send events to the webview
 	isThinking = false;
 	isToolInUse = false;
+	isToolUsePermissionRecieved = false;
+	toolUsePermission: string | undefined = undefined;
 
 	constructor(provider: DevAssistProvider, apiConfiguration: ApiConfiguration, task?: string) {
 		this.providerRef = new WeakRef(provider);
@@ -249,6 +251,24 @@ export class DevAssist {
 		// await this.say("text", this.askResponseText);
 		const didEndLoop = this.recursivelyMakeClaudeRequests([{ type: "text", text }], false);
 		// this.receivedResponse = true;
+	}
+
+	handlePermissionResponse(toolUsePermission: string) {
+		this.isToolUsePermissionRecieved = true;
+		this.toolUsePermission = toolUsePermission;
+	}
+
+	checkIfToolUsePermissionDenied() {
+		if (this.toolUsePermission === "DENIED") {
+			return true;
+		} else {
+			return false;
+		}
+	}
+
+	resetToolUsePermission() {
+		this.isToolUsePermissionRecieved = false;
+		this.toolUsePermission = undefined;
 	}
 
 	async presentAssistantMessage(block: any) {
@@ -446,6 +466,25 @@ export class DevAssist {
 						break;
 					}
 					case "read_file": {
+						// Add the permission logic
+						this.providerRef.deref()?.postMessageToWebview({
+							type: "requestPermission",
+							message: "DevAssist needs permission to read the file. Do you want to proceed?",
+							permissionType: "read_file",
+							params: block.params,
+						});
+
+						await pWaitFor(() => this.isToolUsePermissionRecieved, { interval: 100 });
+						if (this.checkIfToolUsePermissionDenied()) {
+							this.userMessageContent.push({
+								type: "text",
+								text: `Permission denied for tool use: ${block.name}`,
+							});
+							this.resetToolUsePermission();
+							break;
+						}
+						this.resetToolUsePermission();
+
 						const relPath: string | undefined = block.params.path;
 
 						// Validate the file path
@@ -510,14 +549,32 @@ export class DevAssist {
 						const [userRejected, result] = await this.executeCommandTool(command);
 						pushToolResult(result);
 						// Add result to messages
-						// this.userMessageContent.push({
-						// 	type: "text",
-						// 	text: `Executed command: ${command}`,
-						// });
-						this.cmdExecuted = true;
+						console.log(result);
+						this.userMessageContent.push({
+							type: "text",
+							text: `Executed command: ${command}, Result: ${result}`,
+						});
+
 						break;
 					}
 					case "write_to_file": {
+						this.providerRef.deref()?.postMessageToWebview({
+							type: "requestPermission",
+							message: "DevAssist needs permission to write to file. Do you want to proceed?",
+							permissionType: "write_to_file",
+							params: block.params,
+						});
+
+						await pWaitFor(() => this.isToolUsePermissionRecieved, { interval: 100 });
+						if (this.checkIfToolUsePermissionDenied()) {
+							this.userMessageContent.push({
+								type: "text",
+								text: `Permission denied for tool use: ${block.name}`,
+							});
+							this.resetToolUsePermission();
+							break;
+						}
+						this.resetToolUsePermission();
 						const relPath: string | undefined = block.params.path;
 						let newContent: string | undefined = block.params.content;
 						if (!relPath || !newContent) {
@@ -872,6 +929,37 @@ export class DevAssist {
 			const commands = `cd ${cwd}`;
 			const [commandRejected, commandResult] = await this.executeCommandTool_for_deploy(commands);
 		}
+
+		return new Promise<[boolean, string]>((resolve, reject) => {
+			const outputChannel = vscode.window.createOutputChannel("Command Output");
+
+			// Use child_process for more reliable output capturing
+			const { exec } = require("child_process");
+
+			exec(command, { cwd }, (error: Error | null, stdout: string, stderr: string) => {
+				// Combine stdout and stderr
+				let fullOutput = "";
+				console.log("stdout:", stdout);
+				if (stdout) {
+					fullOutput += `Standard Output:\n${stdout}\n`;
+					outputChannel.appendLine(`Standard Output:\n${stdout}`);
+				}
+
+				if (stderr) {
+					fullOutput += `Error Output:\n${stderr}\n`;
+					outputChannel.appendLine(`Error Output:\n${stderr}`);
+				}
+
+				if (error) {
+					fullOutput += `Execution Error: ${error.message}\n`;
+					outputChannel.appendLine(`Execution Error: ${error.message}`);
+
+					resolve([false, fullOutput]);
+				} else {
+					resolve([true, fullOutput]);
+				}
+			});
+		});
 	}
 
 	async attemptApiRequest(): Promise<any> {

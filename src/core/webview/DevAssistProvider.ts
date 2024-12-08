@@ -3,6 +3,7 @@ import { getNonce } from "./getNonce";
 import { getUri } from "./getUri";
 import { DevAssist } from "..";
 import { ApiProvider } from "../../shared/api";
+import { permission } from "process";
 
 export const GlobalFileNames = {
 	apiConversationHistory: "api_conversation_history.json",
@@ -136,8 +137,9 @@ export class DevAssistProvider implements vscode.WebviewViewProvider {
 								await this.devAssist?.handleWebviewAskResponse(message);
 								break;
 						}
-
-						// this.devAssist?.handleWebviewAskResponse(message);
+						break;
+					case "permissionResponse":
+						this.devAssist?.handlePermissionResponse(message.response);
 						break;
 				}
 			},
@@ -150,13 +152,14 @@ export class DevAssistProvider implements vscode.WebviewViewProvider {
 		const task = message?.text;
 		await this.clearTask();
 
-		const apiProvider: ApiProvider = "gemini";
+		// const apiProvider: ApiProvider = "openai";
+		const apiProvider: ApiProvider = message.apiProvider;
 		const apiModelId: string = "";
 		const apiKey: string = message.apiKey;
 		const anthropicBaseUrl: string = "";
 		const openAiBaseUrl: string = "";
-		const openAiApiKey: string = "";
-		const openAiModelId: string = "gpt-4o";
+		const openAiApiKey: string = message.apiKey;
+		const openAiModelId: string = "";
 		const ollamaModelId: string = "";
 		const ollamaBaseUrl: string = "";
 		// const geminiApiKey: string = "";
