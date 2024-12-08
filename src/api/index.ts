@@ -7,7 +7,7 @@ import { GeminiHandler } from "./providers/gemini";
 import { OllamaHandler } from "./providers/ollama";
 
 export interface ApiHandler {
-	createMessage(prompt: string, message: Anthropic.Messages.MessageParam[]): ApiStream;
+	createMessage(prompt: string, message: Anthropic.Messages.MessageParam[]): Promise<any>;
 	getModel(): { id: string; info: ModelInfo };
 }
 
@@ -16,15 +16,14 @@ export function createApiHandler(config: ApiConfiguration): ApiHandler {
 	// console.log("apiProvider: ", apiProvider);
 
 	switch (apiProvider) {
-		
-		case "anthropic":
-			return new AnthropicHandler(options);
-		case "openai":
+		// case "anthropic":
+		// 	return new AnthropicHandler(options);
+		case "openai-native":
 			return new OpenAiHandler(options);
 		case "gemini":
 			return new GeminiHandler(options);
-		case "ollama":
-			return new OllamaHandler(options);
+		// case "ollama":
+		// 	return new OllamaHandler(options);
 		default:
 			return new OpenAiHandler(options);
 	}

@@ -1,7 +1,13 @@
 import { Anthropic } from "@anthropic-ai/sdk";
 import OpenAI from "openai";
 import { ApiHandler } from "../";
-import { ApiHandlerOptions, ModelInfo, openAiNativeDefaultModelId, OpenAiNativeModelId, openAiNativeModels } from "../../shared/api";
+import {
+	ApiHandlerOptions,
+	ModelInfo,
+	openAiNativeDefaultModelId,
+	OpenAiNativeModelId,
+	openAiNativeModels,
+} from "../../shared/api";
 import { convertToOpenAiMessages } from "../transform/openai-format";
 import { ApiStream } from "../transform/stream";
 
@@ -14,43 +20,29 @@ export class OpenAiHandler implements ApiHandler {
 		this.client = new OpenAI({
 			apiKey: this.options.openAiApiKey,
 		});
-		// console.log("gemini api key",this.options.openAiApiKey);
+
+		console.log("Received API Key:", options.openAiApiKey);
 	}
 
-	async *createMessage(systemPrompt: string, messages: Anthropic.Messages.MessageParam[]): ApiStream {
+	async createMessage(systemPrompt: string, messages: Anthropic.Messages.MessageParam[]): Promise<any> {
 		switch (this.getModel().id) {
 			case "o1-preview":
 			case "o1-mini": {
-				// o1 doesnt support streaming, non-1 temp, or system prompt
 				const response = await this.client.chat.completions.create({
 					model: this.getModel().id,
 					messages: [{ role: "user", content: systemPrompt }, ...convertToOpenAiMessages(messages)],
 				});
-				yield {
-					type: "text",
-					text: response.choices[0]?.message.content || "",
-				};
-				break;
+				return response.choices[0];
 			}
 			default: {
-				const stream = await this.client.chat.completions.create({
+				const response = await this.client.chat.completions.create({
 					model: this.getModel().id,
-					// max_completion_tokens: this.getModel().info.maxTokens,
 					temperature: 0,
+					seed: 42,
 					messages: [{ role: "system", content: systemPrompt }, ...convertToOpenAiMessages(messages)],
-					stream: true,
-					stream_options: { include_usage: true },
+					stream: false,
 				});
-
-				for await (const chunk of stream) {
-					const delta = chunk.choices[0]?.delta;
-					if (delta?.content) {
-						yield {
-							type: "text",
-							text: delta.content,
-						};
-					}
-				}
+				return response.choices[0]?.message;
 			}
 		}
 	}

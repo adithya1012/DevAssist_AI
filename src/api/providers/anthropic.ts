@@ -22,7 +22,7 @@ export class AnthropicHandler implements ApiHandler {
 		});
 	}
 
-	async *createMessage(systemPrompt: string, messages: Anthropic.Messages.MessageParam[]): ApiStream {
+	async createMessage(systemPrompt: string, messages: Anthropic.Messages.MessageParam[]): Promise<any> {
 		let stream: AnthropicStream<Anthropic.Beta.PromptCaching.Messages.RawPromptCachingBetaMessageStreamEvent>;
 		const modelId = this.getModel().id;
 		switch (modelId) {
@@ -69,7 +69,7 @@ export class AnthropicHandler implements ApiHandler {
 						// tools, // cache breakpoints go from tools > system > messages, and since tools dont change, we can just set the breakpoint at the end of system (this avoids having to set a breakpoint at the end of tools which by itself does not meet min requirements for haiku caching)
 						// tool_choice: { type: "auto" },
 						// tools: tools,
-						stream: true,
+						// stream: true,
 					},
 					(() => {
 						// prompt caching: https://x.com/alexalbert__/status/1823751995901272068

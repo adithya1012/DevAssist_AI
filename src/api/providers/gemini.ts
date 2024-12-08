@@ -14,32 +14,37 @@ export class GeminiHandler implements ApiHandler {
 			throw new Error("API key is required for Google Gemini");
 		}
 		this.options = options;
-	
-			// console.log("Received API Key:", options.geminiApiKey);
-		  
-		  
+
+		// console.log("Received API Key:", options.geminiApiKey);
+
 		this.client = new GoogleGenerativeAI(options.geminiApiKey);
 	}
 
-	async *createMessage(systemPrompt: string, messages: Anthropic.Messages.MessageParam[]): ApiStream {
+	async createMessage(systemPrompt: string, messages: Anthropic.Messages.MessageParam[]): Promise<any> {
 		const model = this.client.getGenerativeModel({
 			model: this.getModel().id,
 			systemInstruction: systemPrompt,
 		});
-		const result = await model.generateContentStream({
+		const result = await model.generateContent({
 			contents: messages.map(convertAnthropicMessageToGemini),
 			generationConfig: {
 				// maxOutputTokens: this.getModel().info.maxTokens,
 				temperature: 0,
 			},
 		});
-
-		for await (const chunk of result.stream) {
-			yield {
-				type: "text",
-				text: chunk.text(),
+		if (result.response.candidates && result.response.candidates.length > 0) {
+			return { content: result.response.candidates[0].content.parts[0].text };
+		} else {
+			return {
+				content: "No response from Gemini",
 			};
 		}
+		// for await (const chunk of result.stream) {
+		// 	yield {
+		// 		type: "text",
+		// 		text: chunk.text(),
+		// 	};
+		// }
 	}
 
 	getModel(): { id: GeminiModelId; info: ModelInfo } {
