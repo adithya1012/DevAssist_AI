@@ -151,6 +151,7 @@ export class DevAssist {
 		try {
 			this.assistantMessageContent = [];
 			this.didCompleteReadingStream = false;
+			this.breakLoop = false;
 			this.userMessageContent = [];
 			this.currentStreamingContentIndex = 0;
 			// const response = await this.attemptApiRequest(-1);
@@ -179,6 +180,11 @@ export class DevAssist {
 							deployToolCalled = true;
 						}
 						await this.presentAssistantMessage(block);
+						if (this.breakLoop) {
+							this.breakLoop = false;
+							recussiveCall = false;
+							break;
+						}
 						// if (block["name"] === "ask_followup_question" || block["name"] === "attempt_completion") {
 						// 	this.breakLoop = true;
 						// } else {
@@ -231,9 +237,6 @@ export class DevAssist {
 						this.cmdExecuted = true;
 					}
 				} else {
-					this.informUser(
-						"LLM is not able to respond. Please create a new chat with the same prompt to proceed."
-					);
 					this.deployToolCalled = false;
 					didEndLoop = true;
 					this.repoCreated = true;
@@ -484,6 +487,7 @@ export class DevAssist {
 							});
 							this.deployToolCalled = false;
 							this.repoCreated = true; // Set to true to avoid the first check
+							this.breakLoop = true;
 						}
 						break;
 					}
@@ -961,11 +965,12 @@ export class DevAssist {
 				type: "text",
 				text: `Could not created repository. Error: ${error.message}, use attempt_completion to inform user about this.`,
 			});
+			console.error(error);
 			return [false, ""];
 		} finally {
 			this.repoCreated = true;
-			const commands = `cd ${cwd}`;
-			const [commandRejected, commandResult] = await this.executeCommandTool_for_deploy(commands);
+			// const commands = `cd ${cwd}`;
+			// const [commandRejected, commandResult] = await this.executeCommandTool_for_deploy(commands);
 		}
 	}
 
