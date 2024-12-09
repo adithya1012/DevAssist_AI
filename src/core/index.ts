@@ -215,7 +215,7 @@ export class DevAssist {
 					this.LLmLoopStuckCount++;
 					this.userMessageContent.push({
 						type: "text",
-						text: `[ERROR] You did not use a tool in your previous response! Please retry with a tool use.`,
+						text: `[IMPORTANT] [ERROR] You did not use a tool in your previous response! You SHOULD use tool in the response.`,
 					});
 				}
 				if ((recussiveCall || deployToolCalled) && this.LLmLoopStuckCount <= 5) {
@@ -567,7 +567,7 @@ export class DevAssist {
 						const [userRejected, result] = await this.executeCommandTool(command);
 						pushToolResult(result);
 						// Add result to messages
-						console.log(result);
+						// console.log(result);
 						this.userMessageContent.push({
 							type: "text",
 							text: `Executed command: ${command}, Result: ${result}`,
@@ -600,8 +600,8 @@ export class DevAssist {
 								.replace(/&quot;/g, '"');
 						}
 
-						console.log(block);
-						console.log(relPath, newContent);
+						// console.log(block);
+						// console.log(relPath, newContent);
 						this.providerRef.deref()?.postMessageToWebview({
 							type: "requestPermission",
 							message: "DevAssist needs permission to write to file. Do you want to proceed?",
@@ -1069,7 +1069,7 @@ export class DevAssist {
 				details += result;
 			}
 		}
-		console.log("details", details);
+		// console.log("details", details);
 		return `<environment_details>\n${details.trim()}\n</environment_details>`;
 	}
 }
