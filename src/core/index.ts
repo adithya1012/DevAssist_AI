@@ -231,6 +231,9 @@ export class DevAssist {
 						this.cmdExecuted = true;
 					}
 				} else {
+					this.informUser(
+						"LLM is not able to respond. Please create a new chat with the same prompt to proceed."
+					);
 					this.deployToolCalled = false;
 					didEndLoop = true;
 					this.repoCreated = true;
