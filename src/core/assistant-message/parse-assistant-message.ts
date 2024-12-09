@@ -131,5 +131,10 @@ export function parseAssistantMessage(assistantMessage: string) {
 		contentBlocks.push(currentTextContent);
 	}
 
-	return contentBlocks;
+	return contentBlocks.filter((block) => {
+		if (block.type === "text") {
+			return block.content.trim() !== "";
+		}
+		return true;
+	});
 }
