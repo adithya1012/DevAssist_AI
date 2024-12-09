@@ -17,6 +17,7 @@ export const toolUseNames = [
 	"ask_followup_question",
 	"attempt_completion",
 	"search_files", // Added "search_files" here
+	"deploy_to_cloud"
 ] as const;
 
 // Converts array of tool call names into a union type ("execute_command" | "read_file" | ...)
@@ -31,6 +32,7 @@ export const toolParamNames = [
 	"recursive",
 	"question",
 	"result",
+	"name"
 ] as const;
 
 export type ToolParamName = (typeof toolParamNames)[number];
@@ -71,4 +73,9 @@ export interface AttemptCompletionToolUse extends ToolUse {
 export interface SearchFilesToolUse extends ToolUse {
 	name: "search_files";
 	params: Partial<Pick<Record<ToolParamName, string>, "regex" | "file_pattern" | "recursive">>;
+}
+
+export interface DeployToCloud extends ToolUse {
+	name: "deploy_to_cloud";
+	params: Partial<Pick<Record<ToolParamName, string>, "path" | "name" >>;
 }

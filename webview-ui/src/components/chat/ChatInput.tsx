@@ -3,12 +3,11 @@ import { useState } from "react";
 import { vscode } from "../../utils/vscode";
 import { useExtension } from "../../context/ExtensionContext";
 
-
 const ChatInput = ({ scrollChatViewToBottom, ...props }: any) => {
 	// const [newTask, setNewTask] = useState(true);
 	const [value, setValue] = useState("Create a simple calculator app using HTML, CSS and JavaScript");
 
-	const { apiConfiguration, addAssistantMessage, newTask,setNewTask} = useExtension();
+	const { apiConfiguration, addAssistantMessage, newTask, setNewTask } = useExtension();
 
 	const handleSubmit = (event: any) => {
 		event.preventDefault();

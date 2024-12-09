@@ -6,6 +6,7 @@ import { ApiHandler, createApiHandler } from "../api";
 import * as path from "path";
 import os from "os";
 import { SYSTEM_PROMPT } from "./prompts/system";
+import { DEPLOY_PROMPT } from "./prompts/deployment_prompt";
 import { AssistantMessageContent, parseAssistantMessage, ToolParamName, ToolUseName } from "./assistant-message";
 import cloneDeep from "clone-deep";
 import { formatResponse } from "./prompts/responses";
@@ -17,6 +18,14 @@ import { listFiles } from "./tools/listFiles";
 import { DiffViewProvider } from "./editor/DiffViewProvider";
 import { fileExistsAtPath } from "../utils/fs";
 import delay from "delay";
+import {
+	checkTerraformInstalled,
+	checkGCPInstalled,
+	checkGitinstalled,
+	isGCloudLoggedIn,
+	isGhInstalled,
+	isGhLoggedIn,
+} from "../utils/requirement";
 
 const cwd =
 	vscode.workspace.workspaceFolders?.map((folder) => folder.uri.fsPath).at(0) ?? path.join(os.homedir(), "Desktop");
@@ -33,7 +42,7 @@ export class DevAssist {
 	assistantMessageContent: any[] = [];
 	didCompleteReadingStream: boolean = false;
 	userMessageContent: any[] = [];
-	currentStreamingContentIndex = 0; // TODO: update index of the current content being streamed
+	currentStreamingContentIndex = 0;
 	askFollowup: boolean = false; // this is the variable that will be used to determine if ask_followup_question
 	askFollowupIndex: number = 0;
 	askResponseText: string | undefined = "";
@@ -41,7 +50,16 @@ export class DevAssist {
 	private diffViewProvider: DiffViewProvider;
 
 	breakLoop: boolean = false;
-
+	terraformInstalled: boolean = false;
+	gcpInstalled: boolean = false;
+	gitInstalled: boolean = false;
+	ghInstalled: boolean = false;
+	GCloudLoggedIn: boolean = false;
+	ghLoggedIn: boolean = false;
+	deployToolCalled: boolean = false;
+	repoCreated: boolean = true; // Initially set to true to avoid the first check
+	LLmLoopStuckCount: number = 0;
+	cmdExecuted: boolean = true;
 	// Flags to keep track of the state of the tool use in current task to send events to the webview
 	isThinking = false;
 	isToolInUse = false;
@@ -90,8 +108,6 @@ export class DevAssist {
 	private async startTask(task?: string): Promise<void> {
 		this.messages = [];
 		this.apiConversationHistory = [];
-		// TODO: At each prominent stage we need to show a message to the user as a update.
-		// await this.providerRef.deref()?.postStateToWebview(); // This should be called after each message update and handled in UI.
 
 		await this.say("text", task);
 
@@ -125,9 +141,8 @@ export class DevAssist {
 		this.providerRef.deref()?.postMessageToWebview({
 			type: "showThinking",
 		});
-		// TODO: FIXME: Environment is coming Undefined
 		const environmentDetails = await this.loadContext(userContent, includeFileDetails);
-		// const environmentDetails = "NONE";
+
 		// add environment details as its own text block, separate from tool results
 		userContent.push({ type: "text", text: environmentDetails });
 
@@ -136,26 +151,49 @@ export class DevAssist {
 		try {
 			this.assistantMessageContent = [];
 			this.didCompleteReadingStream = false;
+			this.breakLoop = false;
 			this.userMessageContent = [];
 			this.currentStreamingContentIndex = 0;
-			const response = await this.attemptApiRequest(-1); // TODO -1 is a placeholder for now. For multiple communication we need to replace it by last message index
+			// const response = await this.attemptApiRequest(-1);
+			let response = await this.attemptApiRequest();
 			let assistantMessage = "";
+			let recussiveCall = true;
+			let deployToolCalled = false;
 			try {
 				if (response.content) {
 					assistantMessage = response.content;
 					this.assistantMessageContent = parseAssistantMessage(assistantMessage);
+					// this.assistantMessageContent.forEach(async (block) => {
+					// 	if (block.name === "deploy_to_cloud") {
+					// 		deployToolCalled = true;
+					// 	}
+					// });
 					for (let i = 0; i < this.assistantMessageContent.length; i++) {
 						const block = this.assistantMessageContent[i];
-						await this.presentAssistantMessage(block);
-						if (block["name"] === "ask_followup_question" || block["name"] === "attempt_completion") {
-							this.breakLoop = true;
-						} else {
-							this.breakLoop = false;
+						// if (block.name === "ask_followup_question" || block.name === "attempt_completion") {
+						// 	recussiveCall = false;
+						// }
+						if (block.name === "ask_followup_question" || block.name === "attempt_completion") {
+							recussiveCall = false;
 						}
+						if (block.name === "deploy_to_cloud") {
+							deployToolCalled = true;
+						}
+						await this.presentAssistantMessage(block);
+						if (this.breakLoop) {
+							this.breakLoop = false;
+							recussiveCall = false;
+							break;
+						}
+						// if (block["name"] === "ask_followup_question" || block["name"] === "attempt_completion") {
+						// 	this.breakLoop = true;
+						// } else {
+						// 	this.breakLoop = false;
+						// }
 					}
-					if (!this.breakLoop) {
-						this.recursivelyMakeClaudeRequests(this.userMessageContent, false);
-					}
+					// if (!this.breakLoop) {
+					// 	this.recursivelyMakeClaudeRequests(this.userMessageContent, false);
+					// }
 				}
 			} catch (error) {
 				console.error(error);
@@ -180,13 +218,30 @@ export class DevAssist {
 
 				const didToolUse = this.assistantMessageContent.some((block) => block.type === "tool_use");
 				if (!didToolUse) {
+					this.LLmLoopStuckCount++;
 					this.userMessageContent.push({
 						type: "text",
-						text: `[ERROR] You did not use a tool in your previous response! Please retry with a tool use.`,
+						text: `[IMPORTANT] [ERROR] You did not use a tool in your previous response! You SHOULD use tool in the response.`,
 					});
 				}
-
-				didEndLoop = true;
+				if ((recussiveCall || deployToolCalled) && this.LLmLoopStuckCount <= 10) {
+					try {
+						pWaitFor(() => this.repoCreated && this.cmdExecuted, { interval: 100, timeout: 60000 }).then(
+							() => {
+								this.recursivelyMakeClaudeRequests(this.userMessageContent, false);
+							}
+						);
+					} catch (error) {
+						console.error(error);
+						this.repoCreated = true;
+						this.cmdExecuted = true;
+					}
+				} else {
+					this.deployToolCalled = false;
+					didEndLoop = true;
+					this.repoCreated = true;
+					this.cmdExecuted = true;
+				}
 			} else {
 				await this.say(
 					"error",
@@ -313,14 +368,10 @@ export class DevAssist {
 					}
 				};
 				const pushToolResult = (content: any) => {
-					this.userMessageContent.push({
-						type: "text",
-						text: `${toolDescription()} Result:`,
-					});
 					if (typeof content === "string") {
 						this.userMessageContent.push({
 							type: "text",
-							text: content || "(tool did not return anything)",
+							text: `${toolDescription()} Result: ${content}`,
 						});
 					} else {
 						this.userMessageContent.push(...content);
@@ -343,6 +394,103 @@ export class DevAssist {
 					return text.replace(tagRegex, "");
 				};
 				switch (block.name) {
+					case "deploy_to_cloud": {
+						this.deployToolCalled = true;
+						this.repoCreated = false;
+						// check for dependicies are installed or not
+						// await checkTerraformInstalled().then((isInstalled) => {
+						// 	if (isInstalled) {
+						// 		this.terraformInstalled = true;
+						// 	} else {
+						// 		console.log("Terraform is not installed. Please install it to proceed.");
+						// 	}
+						// });
+						await checkGCPInstalled().then(async (isInstalled) => {
+							if (isInstalled) {
+								this.gcpInstalled = true;
+								await isGCloudLoggedIn().then((isLoggedIn) => {
+									if (isLoggedIn) {
+										this.GCloudLoggedIn = true;
+									} else {
+										this.informUser(
+											"We are running gcloud auth list and we see that, you are not logged into any Google Cloud hosts. \n\n To log in, run: gcloud auth login. https://cloud.google.com/sdk/gcloud/reference/auth/login"
+										);
+									}
+								});
+							} else {
+								this.informUser(
+									"We are running 'gcloud --version' and we see that Google Cloud SDK (gcloud) is not installed. Please install it to proceed. \n\n To install, visit https://cloud.google.com/sdk/docs/install \n\n Once you install please login by 'gcloud auth login' command."
+								);
+							}
+						});
+						await checkGitinstalled().then((isInstalled) => {
+							if (isInstalled) {
+								this.gitInstalled = true;
+							} else {
+								this.informUser(
+									"We are running 'git --version' and we see that Git is not installed. Please install it to proceed. \n\n To install, visit https://git-scm.com/downloads"
+								);
+							}
+						});
+						await isGhInstalled().then(async (isInstalled) => {
+							if (isInstalled) {
+								this.ghInstalled = true;
+								await isGhLoggedIn().then((isLoggedIn) => {
+									if (isLoggedIn) {
+										this.ghLoggedIn = true;
+									} else {
+										this.informUser(
+											"We are running 'gh auth status' and we see that, you are not logged into any GitHub hosts (gh). \n\n To log in, run: 'gh auth login'."
+										);
+									}
+								});
+							} else {
+								this.informUser(
+									"We are running 'gh --version' and we see that GitHub CLI (gh) is not installed. Please install it to proceed. \n\n To install, visit https://cli.github.com/ .\n\n Once you install please login by 'gh auth login' command."
+								);
+							}
+						});
+
+						if (
+							// this.terraformInstalled &&
+							this.gcpInstalled &&
+							this.gitInstalled &&
+							this.ghInstalled &&
+							this.GCloudLoggedIn &&
+							this.ghLoggedIn
+						) {
+							// All dependies are installed and user is logged in to gcloud
+
+							const relPath: string | undefined = block.params.path;
+							// Validate the file path
+							if (!relPath) {
+								pushToolResult(await this.sayAndCreateMissingParamError("read_file", "path"));
+								break;
+							}
+							const absolutePath = path.resolve(cwd, relPath);
+
+							const [success, result] = await this.setupAndPushRepo(absolutePath, block.params.name);
+							if (success) {
+								this.informUser("Repository created successfully. Repository URL: " + result);
+							} else {
+								this.informUser(
+									`${result} \n\n Error creating repository with the name block.params.name. Please try again with a new chat.`
+								);
+							}
+						} else {
+							this.informUser(
+								"Please install above dependencies and create a new chat with the same prompt to proceed \n\n"
+							);
+							this.userMessageContent.push({
+								type: "text",
+								text: `User did not install the dependencies. He infomred to install the requrement to host the application in cloud. Once you get the any response from user, you SHOULD call deploy_to_cloud tool again to check for dependencies.`,
+							});
+							this.deployToolCalled = false;
+							this.repoCreated = true; // Set to true to avoid the first check
+							this.breakLoop = true;
+						}
+						break;
+					}
 					case "read_file": {
 						// Add the permission logic
 						this.providerRef.deref()?.postMessageToWebview({
@@ -402,22 +550,22 @@ export class DevAssist {
 
 							// Push result for further processing
 							pushToolResult(cleanedContent);
-							// this.recursivelyMakeClaudeRequests(this.userMessageContent, false); // TODO: This code need to be replaced with the user permission from Nidhi's UI code integration.
 						} catch (err: any) {
 							// Handle file read errors
 							console.error(err);
 							const errorMessage = `Error reading file '${relPath}': ${err.message}`;
 							pushToolResult(errorMessage);
 
-							this.userMessageContent.push({
-								type: "text",
-								text: errorMessage,
-							});
+							// this.userMessageContent.push({
+							// 	type: "text",
+							// 	text: errorMessage,
+							// });
 						}
 
 						break;
 					}
 					case "execute_command": {
+						this.cmdExecuted = false;
 						const command: string = block.params.command;
 						if (!command) {
 							pushToolResult(await this.sayAndCreateMissingParamError("execute_command", "command"));
@@ -426,12 +574,12 @@ export class DevAssist {
 						const [userRejected, result] = await this.executeCommandTool(command);
 						pushToolResult(result);
 						// Add result to messages
-						console.log(result);
+						// console.log(result);
 						this.userMessageContent.push({
 							type: "text",
 							text: `Executed command: ${command}, Result: ${result}`,
 						});
-
+						this.cmdExecuted = true;
 						break;
 					}
 					case "write_to_file": {
@@ -459,8 +607,8 @@ export class DevAssist {
 								.replace(/&quot;/g, '"');
 						}
 
-						console.log(block);
-						console.log(relPath, newContent);
+						// console.log(block);
+						// console.log(relPath, newContent);
 						this.providerRef.deref()?.postMessageToWebview({
 							type: "requestPermission",
 							message: "DevAssist needs permission to write to file. Do you want to proceed?",
@@ -611,10 +759,10 @@ export class DevAssist {
 							const errorMessage = `Error searching files in '${searchDirectory}': ${err.message}`;
 							pushToolResult(errorMessage);
 
-							this.userMessageContent.push({
-								type: "text",
-								text: errorMessage,
-							});
+							// this.userMessageContent.push({
+							// 	type: "text",
+							// 	text: errorMessage,
+							// });
 						}
 
 						break;
@@ -668,8 +816,6 @@ export class DevAssist {
 								});
 							}
 
-							// this.recursivelyMakeClaudeRequests(this.userMessageContent, false); // TODO: This code need to be replaced with the user permission from Nidhi's UI code integration.
-
 							// Optionally show file list in webview
 							// this.providerRef.deref()?.postMessageToWebview({
 							// 	type: "systemMessage",
@@ -699,21 +845,26 @@ export class DevAssist {
 					}
 					case "ask_followup_question": {
 						const followupQuestion = block.params.question;
-						this.providerRef.deref()?.postMessageToWebview({
-							type: "hideThinking",
-						});
-						this.providerRef.deref()?.postMessageToWebview({
-							type: "systemMessage",
-							// thinking: true,
-							message: followupQuestion,
-						});
+						this.informUser(followupQuestion);
 						break;
 					}
 				}
 
-				break;
+				// if (block.name !== "ask_followup_question" && block.name !== "attempt_completion") {
+				// 	this.recursivelyMakeClaudeRequests(this.userMessageContent, false);
+				// }
 			}
 		}
+	}
+
+	async informUser(message: string) {
+		this.providerRef.deref()?.postMessageToWebview({
+			type: "hideThinking",
+		});
+		this.providerRef.deref()?.postMessageToWebview({
+			type: "systemMessage",
+			message: message,
+		});
 	}
 
 	async executeCommandTool(command: string): Promise<[boolean, string]> {
@@ -730,7 +881,6 @@ export class DevAssist {
 			exec(command, { cwd }, (error: Error | null, stdout: string, stderr: string) => {
 				// Combine stdout and stderr
 				let fullOutput = "";
-				console.log("stdout:", stdout);
 				if (stdout) {
 					fullOutput += `Standard Output:\n${stdout}\n`;
 					outputChannel.appendLine(`Standard Output:\n${stdout}`);
@@ -753,15 +903,92 @@ export class DevAssist {
 		});
 	}
 
-	async attemptApiRequest(previousApiReqIndex: number): Promise<any> {
+	async executeCommandTool_for_deploy(command: string): Promise<[boolean, string]> {
+		const terminalInfo = await this.terminalManager.getOrCreateTerminal(cwd);
+		terminalInfo.show();
+		terminalInfo.sendText(command);
+
+		return new Promise<[boolean, string]>((resolve, reject) => {
+			const outputChannel = vscode.window.createOutputChannel("Command Output");
+
+			// Use child_process for more reliable output capturing
+			const { exec } = require("child_process");
+
+			exec(command, { cwd }, (error: Error | null, stdout: string, stderr: string) => {
+				// Combine stdout and stderr
+				let fullOutput = "";
+				if (stdout) {
+					fullOutput += `${stdout}`.trim();
+					resolve([false, fullOutput]);
+				}
+				if (stderr) {
+					fullOutput += `${stderr}`.trim();
+					resolve([true, fullOutput]);
+				}
+				if (error) {
+					fullOutput += `${error.message}`.trim();
+					resolve([true, fullOutput]);
+				}
+			});
+		});
+	}
+
+	async setupAndPushRepo(path: string, repoName: string): Promise<[boolean, string]> {
 		try {
-			let systemPrompt = await SYSTEM_PROMPT(cwd);
+			let result = "";
+
+			// Step 1: Get the GitHub username
+			const [usernameRejected, usernameResult] = await this.executeCommandTool_for_deploy(
+				"gh api user -q '.login'"
+			);
+			if (usernameRejected) {
+				result = `Failed to get GitHub username. Please run the command gh api user -q '.login'`;
+				return [true, result];
+			}
+			const gitUsername = usernameResult.trim();
+
+			const createRepoCommand = `cd ${path} && git init && git add . && git commit -m "Initial commit" && gh repo create ${gitUsername}/${repoName} --public --source=. && git branch -M main && git push -u origin main`;
+			const [createRepoRejected, createRepoResult] = await this.executeCommandTool_for_deploy(createRepoCommand);
+			if (createRepoRejected) {
+				result = `Failed to create repository.`;
+				return [false, result];
+			}
+			console.log(`Repository "${repoName}" created and code pushed to the 'main' branch successfully.`);
+			result = `https://github.com/${gitUsername}/${repoName}`;
+			this.userMessageContent.push({
+				type: "text",
+				text: `Repository URL : ${result}`,
+			});
+			return [true, result];
+		} catch (error) {
+			this.userMessageContent.push({
+				type: "text",
+				text: `Could not created repository. Error: ${error.message}, use attempt_completion to inform user about this.`,
+			});
+			console.error(error);
+			return [false, ""];
+		} finally {
+			this.repoCreated = true;
+			// const commands = `cd ${cwd}`;
+			// const [commandRejected, commandResult] = await this.executeCommandTool_for_deploy(commands);
+		}
+	}
+
+	async attemptApiRequest(): Promise<any> {
+		try {
+			let systemPrompt: string;
+			if (this.deployToolCalled) {
+				let deployPrompt = await DEPLOY_PROMPT(cwd);
+				systemPrompt = await SYSTEM_PROMPT(cwd);
+				systemPrompt = systemPrompt + deployPrompt;
+			} else {
+				systemPrompt = await SYSTEM_PROMPT(cwd);
+			}
 			const response = await this.api.createMessage(systemPrompt, this.apiConversationHistory);
 			return response;
 		} catch (error) {
 			console.error(error);
 			await this.say("api_req_retried");
-			// TODO: Based on which error is thrown, we can retry the request
 		}
 	}
 
@@ -850,7 +1077,7 @@ export class DevAssist {
 				details += result;
 			}
 		}
-		console.log("details", details);
+		// console.log("details", details);
 		return `<environment_details>\n${details.trim()}\n</environment_details>`;
 	}
 }
