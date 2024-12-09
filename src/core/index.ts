@@ -218,7 +218,7 @@ export class DevAssist {
 						text: `[IMPORTANT] [ERROR] You did not use a tool in your previous response! You SHOULD use tool in the response.`,
 					});
 				}
-				if ((recussiveCall || deployToolCalled) && this.LLmLoopStuckCount <= 5) {
+				if ((recussiveCall || deployToolCalled) && this.LLmLoopStuckCount <= 10) {
 					try {
 						pWaitFor(() => this.repoCreated && this.cmdExecuted, { interval: 100, timeout: 60000 }).then(
 							() => {
