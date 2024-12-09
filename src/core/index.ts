@@ -179,15 +179,15 @@ export class DevAssist {
 							deployToolCalled = true;
 						}
 						await this.presentAssistantMessage(block);
-						if (block["name"] === "ask_followup_question" || block["name"] === "attempt_completion") {
-							this.breakLoop = true;
-						} else {
-							this.breakLoop = false;
-						}
+						// if (block["name"] === "ask_followup_question" || block["name"] === "attempt_completion") {
+						// 	this.breakLoop = true;
+						// } else {
+						// 	this.breakLoop = false;
+						// }
 					}
-					if (!this.breakLoop) {
-						this.recursivelyMakeClaudeRequests(this.userMessageContent, false);
-					}
+					// if (!this.breakLoop) {
+					// 	this.recursivelyMakeClaudeRequests(this.userMessageContent, false);
+					// }
 				}
 			} catch (error) {
 				console.error(error);
@@ -228,10 +228,13 @@ export class DevAssist {
 					} catch (error) {
 						console.error(error);
 						this.repoCreated = true;
+						this.cmdExecuted = true;
 					}
 				} else {
 					this.deployToolCalled = false;
 					didEndLoop = true;
+					this.repoCreated = true;
+					this.cmdExecuted = true;
 				}
 			} else {
 				await this.say(
@@ -569,7 +572,7 @@ export class DevAssist {
 							type: "text",
 							text: `Executed command: ${command}, Result: ${result}`,
 						});
-
+						this.cmdExecuted = true;
 						break;
 					}
 					case "write_to_file": {
