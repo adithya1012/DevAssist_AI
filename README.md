@@ -16,3 +16,6 @@
     ```
 
 3. Run the extension by pressing `f5`
+
+
+📄 [View PDF Report](./DevAssistAI%20-%20Research%20Symposium%20Poste_rev1r.pdf)
